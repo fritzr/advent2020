@@ -2,6 +2,7 @@ package p01
 
 import (
   "io"
+  "strings"
   "errors"
   "log"
   "os"
@@ -110,7 +111,68 @@ func LogNumbers(input []int) {
   }
 }
 
-func Main(input_path string, verbose bool) (error) {
+func Usage() {
+  fmt.Println("usage: go run advent2020 1 [N [SUM=2020]]")
+  fmt.Println()
+  fmt.Println("Find N numbers which sum to SUM in the input.")
+  fmt.Println("If no args are given, print the results required by the puzzle.")
+  fmt.Println("If N is given, the default SUM is 2020 (from the puzzle).")
+}
+
+func product(numbers []int) int {
+  result := numbers[0]
+  for _, value := range numbers[1:] {
+    result *= value
+  }
+  return result
+}
+
+func do_sum(input []int, N int, sum int) error {
+  var err error
+  var result []int
+  result, err = NNumbersSummingTo(N, input, sum)
+  if err != nil {
+    return err
+  }
+  if len(result) != N {
+    return errors.New(fmt.Sprintf("expected %d numbers, reported %d",
+    N, len(result)))
+  }
+
+  // String representation of the numbers (1, 2, 3, ...)
+  var nrep strings.Builder
+  for idx, value := range result {
+    nrep.WriteString(strconv.Itoa(value))
+    if idx != len(result) - 1 {
+      nrep.WriteString(", ")
+    }
+  }
+
+  fmt.Printf("%d numbers which sum to %d: %s\n  Product: %d\n",
+    N, sum, nrep.String(), product(result))
+
+  return nil
+}
+
+
+func Day1(input []int) error {
+  var err error
+
+  // Part 1
+  if err = do_sum(input, 2, 2020); err != nil {
+    return err
+  }
+
+  // Part 2
+  if err = do_sum(input, 3, 2020); err != nil {
+    return err
+  }
+
+  return nil
+}
+
+func Main(input_path string, verbose bool, args []string) (error) {
+  // Read the input.
   var input []int
   var err error
   input, err = ReadNumbersFromFile(input_path, verbose)
@@ -121,28 +183,35 @@ func Main(input_path string, verbose bool) (error) {
     return err
   }
 
-  // Part 1
-  var n1 int
-  var n2 int
-  n1, n2, err = NumbersSummingTo(input, 2020)
+  // Check args. On empty, just do what the puzzle asked for.
+  if len(args) == 0 {
+    return Day1(input)
+  }
+
+  // Otherwise, grab N and then look for the SUM.
+
+  if args[0] == "-h" || args[0] == "--help" {
+    Usage()
+    return nil
+  }
+
+  // N
+  var N int
+  N, err = strconv.Atoi(args[0])
   if err != nil {
     return err
   }
-  fmt.Printf("Numbers which sum to 2020: %d, %d\n%d * %d = %d\n",
-    n1, n2, n1, n2, n1 * n2)
+  args = args[1:]
 
-  // Part 2
-  var nums []int
-  nums, err = NNumbersSummingTo(3, input, 2020)
-  if err != nil {
-    return err
+  // SUM
+  sum := 2020
+  if len(args) > 0 {
+    sum, err = strconv.Atoi(args[0])
+    if err != nil {
+      return err
+    }
+    args = args[1:]
   }
-  if len(nums) != 3 {
-    return errors.New(fmt.Sprintf("got %d numbers, expected 3", len(nums)))
-  }
-  fmt.Printf("Three numbers which sum to 2020: %d, %d, %d\n%d * %d * %d = %d\n",
-    nums[0], nums[1], nums[2], nums[0], nums[1], nums[2],
-    nums[0] * nums[1] * nums[2])
 
-  return nil
+  return do_sum(input, N, sum)
 }

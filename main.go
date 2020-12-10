@@ -9,20 +9,26 @@ import (
   "strconv"
   // "github.com/fritzr/advent2020/common"
   "github.com/fritzr/advent2020/p01"
+  "github.com/fritzr/advent2020/p02"
 )
 
-type AdventMain func(path string, verbose bool) (error)
+type AdventMain func(path string, verbose bool, args []string) (error)
 
 func main() {
   args := os.Args[1:]
 
-  if len(args) > 0 && args[0] == "-h" {
-    fmt.Printf("usage: go run %s [-v] [day]\n", path.Base(os.Args[0]))
+  if len(args) > 0 && (args[0] == "-h" || args[0] == "--help") {
+    fmt.Printf("usage: go run %s [-v] [day [args...]]\n", path.Base(os.Args[0]))
+    fmt.Println("")
+    fmt.Println(
+"Run the puzzle the given day's puzzle. Additional puzzle-specific arguments")
+    fmt.Println(
+"may be accepted for some puzzles. Add -h or --help after the day to find out.")
     os.Exit(1)
   }
 
   verbose := false
-  if len(args) > 0 && args[0] == "-v" {
+  if len(args) > 0 && (args[0] == "-v" || args[0] == "--verbose") {
     verbose = true
     args = args[1:]
   }
@@ -39,15 +45,18 @@ func main() {
     switch day {
     default: log.Fatal(fmt.Printf("unimplemented day '%d'\n", day))
     case 1: puzzle = p01.Main
+    case 2: puzzle = p02.Main
     }
+
+    args = args[1:]
   }
 
-  RunPuzzle(day, puzzle, verbose)
+  RunPuzzle(day, puzzle, verbose, args)
 }
 
-func RunPuzzle(day int, puzzle AdventMain, verbose bool) {
+func RunPuzzle(day int, puzzle AdventMain, verbose bool, args []string) {
   path := path.Join(".", fmt.Sprintf("p%02d", day), "input")
-  err := puzzle(path, verbose)
+  err := puzzle(path, verbose, args)
   if err != nil {
     log.Fatal(err)
   }
