@@ -76,6 +76,7 @@ func ReadBoardingPassesFromFile(path string) ([]BoardingPass, error) {
   if err != nil {
     return []BoardingPass{}, err
   }
+  defer file.Close()
   return ReadBoardingPasses(file)
 }
 
