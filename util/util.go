@@ -1,5 +1,9 @@
 package util
 
+import (
+  "strings"
+)
+
 func first_not_of(haystack []byte, hay byte) int {
   for idx, c := range haystack {
     if c != hay {
@@ -60,4 +64,9 @@ func Product(numbers []int) int {
     result *= value
   }
   return result
+}
+
+func StringIsSubset(subset string, superset string) bool {
+  return 0 > strings.IndexFunc(subset, func(r rune) bool {
+    return strings.IndexRune(superset, r) < 0 })
 }

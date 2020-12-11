@@ -7,7 +7,7 @@ import (
   "log"
   "os"
   "errors"
-  "github.com/fritzr/advent2020/p04"
+  "github.com/fritzr/advent2020/util"
 )
 
 type Seat struct {
@@ -50,7 +50,7 @@ func NewBoardingPass(line string) (BoardingPass, error) {
     return BoardingPass{},
       errors.New(fmt.Sprintf("BoardingPass: invalid length for '%s'", line))
   }
-  if !p04.StringIsSubset(line[:7], "FB") || !p04.StringIsSubset(line[7:], "LR") {
+  if !util.StringIsSubset(line[:7], "FB") || !util.StringIsSubset(line[7:], "LR") {
     return BoardingPass{},
       errors.New(fmt.Sprintf("BoardingPass: invalid characters in '%s'", line))
   }

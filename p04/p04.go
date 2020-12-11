@@ -13,11 +13,6 @@ import (
 
 type Validator func(value string) bool
 
-func StringIsSubset(subset string, superset string) bool {
-  return 0 > strings.IndexFunc(subset, func(r rune) bool {
-    return strings.IndexRune(superset, r) < 0 })
-}
-
 func validate_byr(value string) bool {
   byr, err := strconv.Atoi(value)
   return len(value) == 4 && err == nil && byr >= 1920 && byr <= 2002
@@ -50,7 +45,7 @@ func validate_hgt(value string) bool {
 
 func validate_hcl(value string) bool {
   return len(value) == 7 && value[0] == '#' && (
-    StringIsSubset(value[1:], "0123456789abcdef"))
+    util.StringIsSubset(value[1:], "0123456789abcdef"))
 }
 
 func validate_ecl(value string) bool {
