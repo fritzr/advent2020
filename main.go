@@ -12,6 +12,7 @@ import (
   "github.com/fritzr/advent2020/p02"
   "github.com/fritzr/advent2020/p03"
   "github.com/fritzr/advent2020/p04"
+  "github.com/fritzr/advent2020/p05"
 )
 
 type AdventMain func(path string, verbose bool, args []string) (error)
@@ -50,6 +51,7 @@ func main() {
     case 2: puzzle = p02.Main
     case 3: puzzle = p03.Main
     case 4: puzzle = p04.Main
+    case 5: puzzle = p05.Main
     }
 
     args = args[1:]
