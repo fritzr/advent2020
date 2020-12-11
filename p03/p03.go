@@ -4,7 +4,7 @@ import (
   "fmt"
   "io"
   "os"
-  "github.com/fritzr/advent2020/p01"
+  "github.com/fritzr/advent2020/util"
 )
 
 func get_line_width(r *os.File) (int, error) {
@@ -113,7 +113,7 @@ func Main(input_path string, verbose bool, args []string) error {
   }
   trees[treenum] = ntrees
 
-  fmt.Printf("Product: %d\n", p01.Product(trees))
+  fmt.Printf("Product: %d\n", util.Product(trees))
 
   return nil
 }

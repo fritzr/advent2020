@@ -9,6 +9,7 @@ import (
   "bufio"
   "fmt"
   "strconv"
+  "github.com/fritzr/advent2020/util"
 )
 
 
@@ -119,14 +120,6 @@ func Usage() {
   fmt.Println("If N is given, the default SUM is 2020 (from the puzzle).")
 }
 
-func Product(numbers []int) int {
-  result := numbers[0]
-  for _, value := range numbers[1:] {
-    result *= value
-  }
-  return result
-}
-
 func do_sum(input []int, N int, sum int) error {
   var err error
   var result []int
@@ -149,7 +142,7 @@ func do_sum(input []int, N int, sum int) error {
   }
 
   fmt.Printf("%d numbers which sum to %d: %s\n  Product: %d\n",
-    N, sum, nrep.String(), Product(result))
+    N, sum, nrep.String(), util.Product(result))
 
   return nil
 }

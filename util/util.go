@@ -53,3 +53,11 @@ func ScanLineGroups(data []byte, atEOF bool) (advance int, token []byte, err err
 
   return advance, token, err
 }
+
+func Product(numbers []int) int {
+  result := numbers[0]
+  for _, value := range numbers[1:] {
+    result *= value
+  }
+  return result
+}
