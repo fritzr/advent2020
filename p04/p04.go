@@ -8,6 +8,7 @@ import (
   "strings"
   "fmt"
   "strconv"
+  "github.com/fritzr/advent2020/util"
 )
 
 type Validator func(value string) bool
@@ -107,57 +108,40 @@ func split_word(word string) (string, string, error) {
   return fields[0], fields[1], nil
 }
 
-func (p *Passport) Read(linesio *bufio.Scanner) error {
-  // Get each line...
-  for linesio.Scan() {
-    line := linesio.Text()
-    // Until we find an empty line.
-    // Return nil to indicate there is more data.
-    if len(line) == 0 {
-      return nil
+func (p *Passport) Read(data string) error {
+  // Split all the words in the data.
+  words := bufio.NewScanner(strings.NewReader(data))
+  words.Split(bufio.ScanWords)
+  for words.Scan() {
+    key, value, err := split_word(words.Text())
+    if err != nil {
+      return err
     }
-    // Split all the words in the line.
-    words := bufio.NewScanner(strings.NewReader(line))
-    words.Split(bufio.ScanWords)
-    for words.Scan() {
-      key, value, err := split_word(words.Text())
-      if err != nil {
-        return err
-      }
-      p.fields[key] = value
-    }
+    p.fields[key] = value
   }
-
-  // Return EOF to indicate there is no more data.
-  return io.EOF
+  return nil
 }
 
-func NewPassport(scanner *bufio.Scanner) (Passport, error) {
+func NewPassport(data string) (Passport, error) {
   p := Passport{}
   p.fields = make(map[string]string, 8)
-  return p, p.Read(scanner)
+  return p, p.Read(data)
 }
 
 func ReadPassports(input io.Reader) ([]Passport, error) {
   scanner := bufio.NewScanner(input)
-  scanner.Split(bufio.ScanLines)
+  scanner.Split(util.ScanLineGroups)
 
   passports := make([]Passport, 0, 1056)
-  err := scanner.Err()
-  for err == nil {
-    p, err := NewPassport(scanner)
-    if err == nil || err == io.EOF {
-      passports = append(passports, p)
-    }
+  for scanner.Scan() {
+    p, err := NewPassport(scanner.Text())
     if err != nil {
-      if err == io.EOF {
-        err = nil
-      }
       return passports, err
     }
+    passports = append(passports, p)
   }
 
-  return passports, nil
+  return passports, scanner.Err()
 }
 
 func ReadPassportsFromFile(path string) ([]Passport, error) {
