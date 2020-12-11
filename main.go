@@ -10,6 +10,7 @@ import (
   // "github.com/fritzr/advent2020/common"
   "github.com/fritzr/advent2020/p01"
   "github.com/fritzr/advent2020/p02"
+  "github.com/fritzr/advent2020/p03"
 )
 
 type AdventMain func(path string, verbose bool, args []string) (error)
@@ -46,6 +47,7 @@ func main() {
     default: log.Fatal(fmt.Printf("unimplemented day '%d'\n", day))
     case 1: puzzle = p01.Main
     case 2: puzzle = p02.Main
+    case 3: puzzle = p03.Main
     }
 
     args = args[1:]
