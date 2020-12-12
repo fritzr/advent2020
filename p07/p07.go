@@ -101,22 +101,15 @@ func (g *RuleGraph) ParseRule(rule string) error {
 // to rules "container contains N bags of contained" reachable from the first
 // bag.
 //
-// fpre and fpost are called for pre-order and post-order traversal.
-// If either is nil, it will not be called. If fpre returns false, traversal
-// will not recurse. This may be used to detect and break cycles.
+// If f returns false, traversal will not recurse.
+// This may be used to detect and break cycles.
 func (g *RuleGraph) TraverseContainedBy(bagName string,
-                                        fpre func(string, string, int) bool,
-                                        fpost func(string, string, int)) {
+                                        f func(string, string, int) bool) {
   bag := g.bags[bagName]
   if bag != nil {
     for container, num := range bag.containedBy {
-      if fpre == nil || fpre(bag.name, container, num) {
-        g.TraverseContainedBy(container, fpre, fpost)
-      }
-    }
-    if fpost != nil {
-      for container, num := range bag.containedBy {
-        fpost(bag.name, container, num)
+      if f == nil || f(bag.name, container, num) {
+        g.TraverseContainedBy(container, f)
       }
     }
   }
@@ -130,39 +123,32 @@ func (g *RuleGraph) TraverseContainedBy(bagName string,
 // to rules "container contains N bags of contained" reachable from the first
 // bag.
 //
-// fpre and fpost are called for pre-order and post-order traversal.
-// If either is nil, it will not be called. If fpre returns false, traversal
-// will not recurse. This may be used to detect and break cycles.
+// If f returns false, traversal will not recurse.
+// This may be used to detect and break cycles.
 func (g *RuleGraph) TraverseContains(bagName string,
-                                     fpre func(string, string, int) bool,
-                                     fpost func(string, string, int)) {
+                                     f func(string, string, int) bool) {
   bag := g.bags[bagName]
   if bag != nil {
     for contained, num := range bag.contains {
-      if fpre == nil || fpre(bag.name, contained, num) {
-        if gVerbose {
-          fmt.Printf("RECURSING: %s => contains %d %s bags\n",
-            bag.name, num, contained)
-        }
-        g.TraverseContains(contained, fpre, fpost)
+      if f == nil || f(bag.name, contained, num) {
+        g.TraverseContains(contained, f)
       }
     }
   }
 }
 
-func (g *RuleGraph) visit_contains_dagsort(bag *Bag,
-                                          stack []*Bag,
-                                          visited map[string]bool) (
-                                            []*Bag, map[string]bool) {
+func (g *RuleGraph) visit_dagsort(
+    bag *Bag, stack []*Bag, visited map[string]bool,
+    children func(*Bag) map[string]int) []*Bag {
   if visited[bag.name] {
-    return stack, visited
+    return stack
   }
   visited[bag.name] = true
-  for name, _ := range bag.contains {
-    stack, visited = g.visit_contains_dagsort(g.bags[name], stack, visited)
+  for name, _ := range children(bag) {
+    stack = g.visit_dagsort(g.bags[name], stack, visited, children)
   }
   stack = append(stack, bag)
-  return stack, visited
+  return stack
 }
 
 // Sort in contains order.
@@ -173,11 +159,10 @@ func (g *RuleGraph) visit_contains_dagsort(bag *Bag,
 func (g *RuleGraph) SortContains() []*Bag {
   stack := make([]*Bag, 0, len(g.bags))
   visited := make(map[string]bool, len(g.bags))
-
   for _, bag := range g.bags {
-    stack, visited = g.visit_contains_dagsort(bag, stack, visited)
+    stack = g.visit_dagsort(bag, stack, visited,
+      func(b *Bag) map[string]int { return b.contains })
   }
-
   return stack
 }
 
@@ -219,7 +204,7 @@ func Main(input_path string, verbose bool, args []string) error {
         fmt.Printf("%s bags contain %d %s bags\n", container, num, contained)
       }
       return isNew
-    }, nil)
+    })
 
   if (verbose) {
     fmt.Println("==============================================")
