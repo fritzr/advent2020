@@ -81,7 +81,15 @@ func (s *Simulator) Step() error {
   if gVerbose {
     fmt.Printf("  STEP %d: insn=%s\n", s.pc, s.insns[s.pc])
   }
-  ops := strings.Fields(s.insns[s.pc])
+  return s.Exec(s.insns[s.pc])
+}
+
+// Execute an instruction instead of the current instruction.
+//
+// First override the PC to be the given value.
+func (s *Simulator) ExecAt(insn string, pc int) error {
+  s.pc = pc
+  ops := strings.Fields(insn)
   if len(ops) == 0 {
     return errors.New(fmt.Sprintf("empty instruction at %d", s.pc))
   }
@@ -94,6 +102,21 @@ func (s *Simulator) Step() error {
     return s.Jump(newPc)
   }
   return err
+}
+
+// Execuate an instruction instead of the current instruction.
+//
+// The PC will updated according to the exec'd instruction.
+// This essentially overrides the current instruction.
+func (s *Simulator) Exec(insn string) error {
+  return ExecAt(insn, s.pc)
+}
+
+func (s *Simulator) Insn(address int) string {
+  if address >= 0 && address < len(s.insns) {
+    return s.insns[address]
+  }
+  return string()
 }
 
 func NewSimulator(input io.Reader) (*Simulator, error) {
@@ -116,15 +139,100 @@ func ReadSimulatorFromFile(path string) (*Simulator, error) {
   return NewSimulator(file)
 }
 
-func Main(input_path string, verbose bool, args []string) error {
-  gVerbose = verbose
+type pathEntry struct {
+  // PC value of the instruction.
+  address int
+  // Whether this instruction is a branch point.
+  branch bool
+  // If this instruction is a branch point, whether the instruction's alternate
+  // form has been attempted.
+  alternate bool // stateNOP or stateJMP
+}
 
-  sim, err := ReadSimulatorFromFile(input_path)
-  if err != nil {
-    return err
+type ProgramFixer struct {
+  s *Simulator
+
+  // Search path for a program which terminates.
+  //
+  // Each entry in the path represents an instruction which we've executed to
+  // get here. If we detect an infinite loop, we walk back through the path
+  // stack to the most recent branch point, then try the alternate branch path
+  // (JMP to NOP or vice-versa). If both lead to an infinite loop, we cut that
+  // path too, add it to the set of dead nodes, and walk back again.
+  path []pathEntry
+  pathIndex int
+
+  // Set of dead nodes.
+  //
+  // If we ever reach a dead node, the program is guaranteed not to terminate.
+  dead map[int]bool
+
+  // Instructions visited.
+  //
+  // For each instruction I in the path, visited[I] is true.
+  // This is essentially a fast way to determine if we're about to cause a
+  // loop. When we're walking back in the path stack, we also need to clear
+  // the visited flag for each instruction we pop to keep them in sync.
+  visited []bool
+}
+
+func NewProgramFixer(s *Simulator) *ProgramFixer {
+  f := new(ProgramFixer)
+  f.s = s
+  f.path = make([]pathEntry, len(f.insns))
+  f.dead = make(map[int]bool, len(f.insns))
+  f.visited = make([]bool, len(f.insns))
+  return f
+}
+
+func isBranch(insn string) bool {
+  return (
+    strings.Fields(insn)[0] == "jmp" || strings.Fields(insn)[0] == "nop")
+}
+
+func (f *ProgramFixer) newPathEntry(addr int) pathEntry {
+  return pathEntry{addr, isBranch(f.s.insns[addr]), false}
+}
+
+func (f *ProgramFixer) stepLoop(addr int) (bool, error) {
+  if f.pathIndex >= len(f.path) || addr >= len(f.s.insns) {
+    return false, io.EOF
   }
 
-  // execution count
+  // See if this instruction causes a loop...
+  f.s.pc = addr
+  f.path[f.pathIndex] = newPathEntry(addr)
+  f.pathIndex++
+  err = f.s.Step()
+  if err != nil {
+    return false, err
+  }
+  if f.visited[f.s.pc] {
+    return markLoop(f.s.pc)
+  }
+
+  // If not, see if the next instruction causes a loop.
+  var loops bool
+  loops, err = stepLoop(f.s.pc)
+  if err != nil {
+    return false, err
+  }
+
+  // If yes, try the alternate instruction.
+  if loops {
+    f.pathIndex--
+    if !f.path[f.pathIndex].alternate {
+      f.s.ExecAt(addr)
+    }
+  }
+}
+
+func (f *ProgramFixer) Fix() error {
+  _, err := stepLoop()
+  return err
+}
+
+func Part1(sim *Simulator) error {
   xcount := make([]int, len(sim.insns))
   fmt.Printf("Loaded %d instructions\n", len(sim.insns))
 
@@ -157,5 +265,29 @@ func Main(input_path string, verbose bool, args []string) error {
     lastPc, sim.insns[lastPc], sim.pc, sim.insns[sim.pc])
 
   fmt.Printf("Accumulator: %d\n", sim.accumulator)
+  return nil
+}
+
+func Part2(sim *Simulator) {
+  fixer := NewProgramFixer(sim)
+  return fixer.Fix()
+}
+
+func Main(input_path string, verbose bool, args []string) error {
+  gVerbose = verbose
+
+  sim, err := ReadSimulatorFromFile(input_path)
+  if err != nil {
+    return err
+  }
+
+  if err = Part1(sim); err != nil {
+    return err
+  }
+
+  if err = Part2(sim); err != nil {
+    returne rr
+  }
+
   return nil
 }
