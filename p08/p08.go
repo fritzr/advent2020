@@ -109,14 +109,14 @@ func (s *Simulator) ExecAt(insn string, pc int) error {
 // The PC will updated according to the exec'd instruction.
 // This essentially overrides the current instruction.
 func (s *Simulator) Exec(insn string) error {
-  return ExecAt(insn, s.pc)
+  return s.ExecAt(insn, s.pc)
 }
 
 func (s *Simulator) Insn(address int) string {
   if address >= 0 && address < len(s.insns) {
     return s.insns[address]
   }
-  return string()
+  return ""
 }
 
 func NewSimulator(input io.Reader) (*Simulator, error) {
@@ -179,9 +179,9 @@ type ProgramFixer struct {
 func NewProgramFixer(s *Simulator) *ProgramFixer {
   f := new(ProgramFixer)
   f.s = s
-  f.path = make([]pathEntry, len(f.insns))
-  f.dead = make(map[int]bool, len(f.insns))
-  f.visited = make([]bool, len(f.insns))
+  f.path = make([]pathEntry, len(f.s.insns))
+  f.dead = make(map[int]bool, len(f.s.insns))
+  f.visited = make([]bool, len(f.s.insns))
   return f
 }
 
@@ -194,26 +194,44 @@ func (f *ProgramFixer) newPathEntry(addr int) pathEntry {
   return pathEntry{addr, isBranch(f.s.insns[addr]), false}
 }
 
+func (f *ProgramFixer) markLoop(addr int) (bool, error) {
+  // TODO?
+  f.dead[addr] = true
+  return true, nil
+}
+
+func (f *ProgramFixer) altInsn(insn string) string {
+  fields := strings.Fields(insn)
+  args := strings.Join(fields[1:], " ")
+  if fields[0] == "jmp" {
+    return "nop " + args
+  }
+  return "jmp " + args
+}
+
 func (f *ProgramFixer) stepLoop(addr int) (bool, error) {
   if f.pathIndex >= len(f.path) || addr >= len(f.s.insns) {
     return false, io.EOF
   }
+  if f.dead[addr] {
+    return true, nil
+  }
 
   // See if this instruction causes a loop...
   f.s.pc = addr
-  f.path[f.pathIndex] = newPathEntry(addr)
+  f.path[f.pathIndex] = f.newPathEntry(addr)
   f.pathIndex++
-  err = f.s.Step()
+  err := f.s.Step()
   if err != nil {
     return false, err
   }
   if f.visited[f.s.pc] {
-    return markLoop(f.s.pc)
+    return f.markLoop(f.s.pc)
   }
 
   // If not, see if the next instruction causes a loop.
   var loops bool
-  loops, err = stepLoop(f.s.pc)
+  loops, err = f.stepLoop(f.s.pc)
   if err != nil {
     return false, err
   }
@@ -222,13 +240,16 @@ func (f *ProgramFixer) stepLoop(addr int) (bool, error) {
   if loops {
     f.pathIndex--
     if !f.path[f.pathIndex].alternate {
-      f.s.ExecAt(addr)
+      f.s.ExecAt(f.altInsn(f.s.insns[addr]), addr)
     }
   }
+
+  // TODO
+  return false, nil
 }
 
 func (f *ProgramFixer) Fix() error {
-  _, err := stepLoop()
+  _, err := f.stepLoop(0)
   return err
 }
 
@@ -238,14 +259,14 @@ func Part1(sim *Simulator) error {
 
   // Part 1: find the first loop.
   lastPc := -1
-  if verbose {
+  if gVerbose {
     fmt.Printf("First: [%02d] %s (acc=%d)\n",
       sim.pc, sim.insns[sim.pc], sim.accumulator)
   }
   xcount[sim.pc] += 1
-  err = sim.Step()
+  err := sim.Step()
   for err == nil {
-    if verbose {
+    if gVerbose {
       fmt.Printf("Next: [%02d] %s (acc=%d)\n",
         sim.pc, sim.insns[sim.pc], sim.accumulator)
     }
@@ -268,7 +289,7 @@ func Part1(sim *Simulator) error {
   return nil
 }
 
-func Part2(sim *Simulator) {
+func Part2(sim *Simulator) error {
   fixer := NewProgramFixer(sim)
   return fixer.Fix()
 }
@@ -286,7 +307,7 @@ func Main(input_path string, verbose bool, args []string) error {
   }
 
   if err = Part2(sim); err != nil {
-    returne rr
+    return err
   }
 
   return nil
