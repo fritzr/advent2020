@@ -9,6 +9,8 @@ import (
   "errors"
 )
 
+var gVerbose = false
+
 type Direction struct {
   action byte
   value int
@@ -149,14 +151,24 @@ func (b *Boat) Move(d Direction) {
   if heading != 0 {
     // Move the waypoint with magnitude and heading.
     b.lat, b.long = move(b.lat, b.long, d.value, heading - 1)
+    if gVerbose {
+      fmt.Printf("Moving %s by %d to (%s, %s)\n",
+        HeadingStrings[heading-1], d.value, b.LatStr(), b.LongStr())
+    }
   } else {
     // Rotate the boat (adjust the heading).
     rotation := Rotations[d.action]
     if rotation != 0 {
       b.head = rotate(b.head, rotation * (d.value / 90))
+      if gVerbose {
+        fmt.Printf("Turning %c by %d => %s\n",
+          d.action, d.value, b.HeadStr())
+      }
     } else {
       // Move the boat along its current heading.
       b.lat, b.long = move(b.lat, b.long, d.value, b.head)
+      fmt.Printf("Moving %s by %d to (%s, %s)\n",
+        b.HeadStr(), d.value, b.LatStr(), b.LongStr())
     }
   }
 }
@@ -262,6 +274,7 @@ func printBoat(boat *Boat, fromLat int, fromLong int) {
 }
 
 func Main(input_path string, verbose bool, args []string) error {
+  gVerbose = verbose
   directions, err := ReadDirectionsFromFile(input_path)
   if err != nil {
     return err
