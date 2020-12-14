@@ -65,7 +65,7 @@ func (s *Simulator) Jump(address int) error {
     s.pc = address
   } else {
     // natural termination
-    if s.pc == len(s.insns) - 1 && address == len(s.insns) {
+    if address == len(s.insns) {
       return io.EOF
     }
     return errors.New(fmt.Sprintf(
@@ -96,7 +96,7 @@ func (s *Simulator) Step() error {
   return err
 }
 
-func NewProgram(input io.Reader) (*Simulator, error) {
+func NewSimulator(input io.Reader) (*Simulator, error) {
   s := new(Simulator)
   s.insns = make([]string, 0, 650)
   scanner := bufio.NewScanner(input)
@@ -107,19 +107,19 @@ func NewProgram(input io.Reader) (*Simulator, error) {
   return s, scanner.Err()
 }
 
-func ReadProgramFromFile(path string) (*Simulator, error) {
+func ReadSimulatorFromFile(path string) (*Simulator, error) {
   file, err := os.Open(path)
   if err != nil {
     return nil, err
   }
   defer file.Close()
-  return NewProgram(file)
+  return NewSimulator(file)
 }
 
 func Main(input_path string, verbose bool, args []string) error {
   gVerbose = verbose
 
-  sim, err := ReadProgramFromFile(input_path)
+  sim, err := ReadSimulatorFromFile(input_path)
   if err != nil {
     return err
   }
