@@ -167,8 +167,10 @@ func (b *Boat) Move(d Direction) {
     } else {
       // Move the boat along its current heading.
       b.lat, b.long = move(b.lat, b.long, d.value, b.head)
-      fmt.Printf("Moving %s by %d to (%s, %s)\n",
-        b.HeadStr(), d.value, b.LatStr(), b.LongStr())
+      if gVerbose {
+        fmt.Printf("Moving %s by %d to (%s, %s)\n",
+          b.HeadStr(), d.value, b.LatStr(), b.LongStr())
+      }
     }
   }
 }
