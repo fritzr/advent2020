@@ -25,21 +25,19 @@ func main() {
   args := os.Args[1:]
 
   if len(args) > 0 && (args[0] == "-h" || args[0] == "--help") {
-    fmt.Printf("usage: go run %s [-v] [day [args...]]\n", path.Base(os.Args[0]))
+    fmt.Printf("usage: go run %s [day [-v] [-i path] [args...]]\n",
+    path.Base(os.Args[0]))
     fmt.Println("")
     fmt.Println(
 "Run the puzzle the given day's puzzle. Additional puzzle-specific arguments")
     fmt.Println(
 "may be accepted for some puzzles. Add -h or --help after the day to find out.")
+    fmt.Println(
+"All puzzles accept '-v' to run verbose and '-i PATH' to override the input.")
     os.Exit(1)
   }
 
-  verbose := false
-  if len(args) > 0 && (args[0] == "-v" || args[0] == "--verbose") {
-    verbose = true
-    args = args[1:]
-  }
-
+  // day
   day := 1
   var puzzle AdventMain = p01.Main
   var err error
@@ -65,12 +63,25 @@ func main() {
     args = args[1:]
   }
 
-  RunPuzzle(day, puzzle, verbose, args)
-}
+  // -v
+  verbose := false
+  if len(args) > 0 && (args[0] == "-v" || args[0] == "--verbose") {
+    verbose = true
+    args = args[1:]
+  }
 
-func RunPuzzle(day int, puzzle AdventMain, verbose bool, args []string) {
-  path := path.Join(".", fmt.Sprintf("p%02d", day), "input")
-  err := puzzle(path, verbose, args)
+  // input override (-i path)
+  input := path.Join(".", fmt.Sprintf("p%02d", day), "input")
+  if len(args) > 0 && (args[0] == "-i" || args[0] == "--input") {
+    if len(args) < 2 {
+      log.Fatal("missing argument to -i")
+    }
+    input = args[1]
+    args = args[1:]
+  }
+
+  // Run the selected puzzle. Pass additional arguments.
+  err = puzzle(input, verbose, args)
   if err != nil {
     log.Fatal(err)
   }
