@@ -3,11 +3,10 @@ package p08
 import (
   "fmt"
   "io"
-  "os"
-  "bufio"
   "errors"
   "strings"
   "strconv"
+  "github.com/fritzr/advent2020/util"
 )
 
 var gVerbose = false
@@ -119,194 +118,148 @@ func (s *Simulator) Insn(address int) string {
   return ""
 }
 
-func NewSimulator(input io.Reader) (*Simulator, error) {
-  s := new(Simulator)
-  s.insns = make([]string, 0, 650)
-  scanner := bufio.NewScanner(input)
-  scanner.Split(bufio.ScanLines)
-  for scanner.Scan() {
-    s.insns = append(s.insns, scanner.Text())
-  }
-  return s, scanner.Err()
+func (s *Simulator) Reset() {
+  s.pc = 0
+  s.accumulator = 0
 }
 
-func ReadSimulatorFromFile(path string) (*Simulator, error) {
-  file, err := os.Open(path)
-  if err != nil {
-    return nil, err
-  }
-  defer file.Close()
-  return NewSimulator(file)
+func (s *Simulator) FindLoop() (int, int, error) {
+  return s.FindLoopFrom(s.pc, s.insns[s.pc])
 }
 
-type pathEntry struct {
-  // PC value of the instruction.
-  address int
-  // Whether this instruction is a branch point.
-  branch bool
-  // If this instruction is a branch point, whether the instruction's alternate
-  // form has been attempted.
-  alternate bool // stateNOP or stateJMP
-}
+func (s *Simulator) FindLoopFrom(pc int, insn string) (int, int, error) {
+  visited := make(map[int]bool)
 
-type ProgramFixer struct {
-  s *Simulator
-
-  // Search path for a program which terminates.
-  //
-  // Each entry in the path represents an instruction which we've executed to
-  // get here. If we detect an infinite loop, we walk back through the path
-  // stack to the most recent branch point, then try the alternate branch path
-  // (JMP to NOP or vice-versa). If both lead to an infinite loop, we cut that
-  // path too, add it to the set of dead nodes, and walk back again.
-  path []pathEntry
-  pathIndex int
-
-  // Set of dead nodes.
-  //
-  // If we ever reach a dead node, the program is guaranteed not to terminate.
-  dead map[int]bool
-
-  // Instructions visited.
-  //
-  // For each instruction I in the path, visited[I] is true.
-  // This is essentially a fast way to determine if we're about to cause a
-  // loop. When we're walking back in the path stack, we also need to clear
-  // the visited flag for each instruction we pop to keep them in sync.
-  visited []bool
-}
-
-func NewProgramFixer(s *Simulator) *ProgramFixer {
-  f := new(ProgramFixer)
-  f.s = s
-  f.path = make([]pathEntry, len(f.s.insns))
-  f.dead = make(map[int]bool, len(f.s.insns))
-  f.visited = make([]bool, len(f.s.insns))
-  return f
-}
-
-func isBranch(insn string) bool {
-  return (
-    strings.Fields(insn)[0] == "jmp" || strings.Fields(insn)[0] == "nop")
-}
-
-func (f *ProgramFixer) newPathEntry(addr int) pathEntry {
-  return pathEntry{addr, isBranch(f.s.insns[addr]), false}
-}
-
-func (f *ProgramFixer) markLoop(addr int) (bool, error) {
-  // TODO?
-  f.dead[addr] = true
-  return true, nil
-}
-
-func (f *ProgramFixer) altInsn(insn string) string {
-  fields := strings.Fields(insn)
-  args := strings.Join(fields[1:], " ")
-  if fields[0] == "jmp" {
-    return "nop " + args
-  }
-  return "jmp " + args
-}
-
-func (f *ProgramFixer) stepLoop(addr int) (bool, error) {
-  if f.pathIndex >= len(f.path) || addr >= len(f.s.insns) {
-    return false, io.EOF
-  }
-  if f.dead[addr] {
-    return true, nil
+  visited[pc] = true
+  lastPc := pc
+  if err := s.ExecAt(insn, pc); err != nil {
+    return -1, -1, err
   }
 
-  // See if this instruction causes a loop...
-  f.s.pc = addr
-  f.path[f.pathIndex] = f.newPathEntry(addr)
-  f.pathIndex++
-  err := f.s.Step()
-  if err != nil {
-    return false, err
-  }
-  if f.visited[f.s.pc] {
-    return f.markLoop(f.s.pc)
-  }
-
-  // If not, see if the next instruction causes a loop.
-  var loops bool
-  loops, err = f.stepLoop(f.s.pc)
-  if err != nil {
-    return false, err
-  }
-
-  // If yes, try the alternate instruction.
-  if loops {
-    f.pathIndex--
-    if !f.path[f.pathIndex].alternate {
-      f.s.ExecAt(f.altInsn(f.s.insns[addr]), addr)
-    }
-  }
-
-  // TODO
-  return false, nil
-}
-
-func (f *ProgramFixer) Fix() error {
-  _, err := f.stepLoop(0)
-  return err
-}
-
-func Part1(sim *Simulator) error {
-  xcount := make([]int, len(sim.insns))
-  fmt.Printf("Loaded %d instructions\n", len(sim.insns))
-
-  // Part 1: find the first loop.
-  lastPc := -1
   if gVerbose {
-    fmt.Printf("First: [%02d] %s (acc=%d)\n",
-      sim.pc, sim.insns[sim.pc], sim.accumulator)
+    fmt.Printf("Exec First: [%02d] %s (acc=%d)\n",
+      s.pc, s.insns[s.pc], s.accumulator)
   }
-  xcount[sim.pc] += 1
-  err := sim.Step()
+
+  err := s.Step()
   for err == nil {
     if gVerbose {
-      fmt.Printf("Next: [%02d] %s (acc=%d)\n",
-        sim.pc, sim.insns[sim.pc], sim.accumulator)
+      fmt.Printf("Exec Next: [%02d] %s (acc=%d)\n",
+        s.pc, s.insns[s.pc], s.accumulator)
     }
-    // Loop detection.
-    if xcount[sim.pc] > 0 {
-      break
+    // Loop!
+    if visited[s.pc] {
+      return lastPc, s.pc, nil
     }
-    lastPc = sim.pc
-    xcount[sim.pc] += 1
-    err = sim.Step()
+    lastPc = s.pc
+    visited[s.pc] = true
+    err = s.Step()
   }
   if err != nil {
-    return err
+    return -1, -1, err
   }
 
-  fmt.Printf("Loop: [%02d] %s => [%02d] %s\n",
-    lastPc, sim.insns[lastPc], sim.pc, sim.insns[sim.pc])
-
-  fmt.Printf("Accumulator: %d\n", sim.accumulator)
-  return nil
+  return -1, -1, nil
 }
 
-func Part2(sim *Simulator) error {
-  fixer := NewProgramFixer(sim)
-  return fixer.Fix()
+func NewSimulator(insns []string) *Simulator {
+  s := new(Simulator)
+  s.insns = insns
+  return s
+}
+
+func Part1(insns []string) (int, error) {
+  sim := NewSimulator(insns)
+
+  loopFrom, loopTo, err := sim.FindLoop()
+  if err != nil {
+    return sim.accumulator, err
+  }
+  if loopFrom < 0 || loopTo < 0 {
+    return sim.accumulator, errors.New("No loop found!")
+  }
+  fmt.Printf("Loop: [%02d] %s => [%02d] %s\n",
+    loopFrom, sim.insns[loopFrom], loopTo, sim.insns[loopTo])
+
+  fmt.Printf("Accumulator: %d\n", sim.accumulator)
+  return sim.accumulator, nil
+}
+
+func FixLoop(insns []string) (int, int, error) {
+  sim := NewSimulator(insns)
+  for pc, insn := range insns {
+    if strings.HasPrefix(insn, "acc ") {
+      continue
+    }
+
+    // See if either the regular instruction or its replacement cause a loop.
+    var altInsn string
+    if strings.HasPrefix(insn, "jmp ") {
+      altInsn = "nop " + insn[4:]
+    } else {
+      altInsn = "jmp " + insn[4:]
+    }
+
+    for _, insn := range []string{insn, altInsn} {
+      sim.insns[pc] = insn
+      if gVerbose {
+        fmt.Printf("Trying [%d] %s (acc=%d)...\n", pc, insn)
+      }
+      // TODO... we could probably do this smarter than running the
+      // whole program each time.
+      sim.Reset()
+      from, to, err := sim.FindLoop()
+      if err != nil {
+        // Natural EOF, good!
+        if err == io.EOF {
+          err = nil // good!
+        } else {
+          pc = sim.pc // location of the error
+        }
+        return pc, sim.accumulator, err
+      }
+      // No loop... but this doesn't result in io.EOF.
+      if from < 0 || to < 0 {
+        return pc, sim.accumulator, nil
+      }
+      if gVerbose {
+        fmt.Printf("... [%d] %s caused loop [%d] %s -> [%d] %s\n",
+          pc, insn, from, insns[from], to, insns[to])
+      }
+    }
+
+    // Restore the original instruction for the next attempt.
+    sim.insns[pc] = insn
+  }
+
+  return -1, 0, errors.New("No fixable loops found")
+}
+
+func Part2(insns []string) (int, int, error) {
+  fixedPc, acc, err := FixLoop(insns)
+  if err != nil {
+    return fixedPc, acc, err
+  }
+  fmt.Printf("Fixed loop at [%d] %s! Accumulator: %d\n",
+    fixedPc, insns[fixedPc], acc)
+  return fixedPc, acc, nil
 }
 
 func Main(input_path string, verbose bool, args []string) error {
   gVerbose = verbose
 
-  sim, err := ReadSimulatorFromFile(input_path)
+  insns, err := util.ReadLinesFromFile(input_path)
   if err != nil {
     return err
   }
 
-  if err = Part1(sim); err != nil {
+  fmt.Printf("Loaded %d instructions\n", len(insns))
+
+  if _, err = Part1(insns); err != nil {
     return err
   }
 
-  if err = Part2(sim); err != nil {
+  if _, _, err = Part2(insns); err != nil {
     return err
   }
 

@@ -9,6 +9,25 @@ import (
   "strings"
 )
 
+func ReadLines(input io.Reader) ([]string, error) {
+  lines := make([]string, 0, 1024)
+  scanner := bufio.NewScanner(input)
+  scanner.Split(bufio.ScanLines)
+  for scanner.Scan() {
+    lines = append(lines, scanner.Text())
+  }
+  return lines, scanner.Err()
+}
+
+func ReadLinesFromFile(path string) ([]string, error) {
+  file, err := os.Open(path)
+  if err != nil {
+    return nil, err
+  }
+  defer file.Close()
+  return ReadLines(file)
+}
+
 func ReadNumbers(input io.Reader) ([]int, error) {
   scanner := bufio.NewScanner(input)
   scanner.Split(bufio.ScanWords)
