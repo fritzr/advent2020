@@ -1,6 +1,7 @@
 package util
 
 import (
+  "fmt"
   "os"
   "io"
   "bufio"
@@ -29,6 +30,12 @@ func ReadNumbersFromFile(path string) ([]int, error) {
   }
   defer file.Close()
   return ReadNumbers(file)
+}
+
+func PrintArray(array []int) {
+  for idx, val := range array {
+    fmt.Printf("  [%2d] %d\n", idx, val)
+  }
 }
 
 func first_not_of(haystack []byte, hay byte) int {
