@@ -1,8 +1,35 @@
 package util
 
 import (
+  "os"
+  "io"
+  "bufio"
+  "strconv"
   "strings"
 )
+
+func ReadNumbers(input io.Reader) ([]int, error) {
+  scanner := bufio.NewScanner(input)
+  scanner.Split(bufio.ScanWords)
+  data := make([]int, 0, 1024)
+  for scanner.Scan() {
+    value, err := strconv.Atoi(scanner.Text())
+    if err != nil {
+      return data, err
+    }
+    data = append(data, value)
+  }
+  return data, scanner.Err()
+}
+
+func ReadNumbersFromFile(path string) ([]int, error) {
+  file, err := os.Open(path)
+  if err != nil {
+    return nil, err
+  }
+  defer file.Close()
+  return ReadNumbers(file)
+}
 
 func first_not_of(haystack []byte, hay byte) int {
   for idx, c := range haystack {
@@ -115,12 +142,18 @@ func (r *RingBuffer) tail() int {
   return r._tail
 }
 
-func (r *RingBuffer) Push(value interface{}) *RingBuffer {
+// Push a new value.
+//
+// Returns the least-recently inserted value which was overwritten.
+func (r *RingBuffer) Push(value interface{}) interface{} {
   r.Move(1)
-  r._data[r.tail()] = value
-  return r
+  tail := r.tail()
+  lru := r._data[tail]
+  r._data[tail] = value
+  return lru
 }
 
+// Pop the most-recently inserted value.
 func (r *RingBuffer) Pop() interface{} {
   result := r._data[r.tail()]
   r.Move(-1)

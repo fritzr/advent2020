@@ -1,12 +1,9 @@
 package p01
 
 import (
-  "io"
   "strings"
   "errors"
   "log"
-  "os"
-  "bufio"
   "fmt"
   "strconv"
   "github.com/fritzr/advent2020/util"
@@ -64,43 +61,6 @@ func NNumbersSummingTo(depth int, input []int, sum int) ([]int, error) {
   }
 
   return []int{}, errors.New(fmt.Sprintf("no %d numbers sum to %d", depth, sum))
-}
-
-func ReadNumbers(r io.Reader, verbose bool) ([]int, error) {
-  result := make([]int, 0, 200)
-
-  bufreader := bufio.NewReader(r)
-  line_bytes, shortRead, err := bufreader.ReadLine()
-  var i int
-  for err == nil && !shortRead {
-    line := string(line_bytes)
-    if verbose {
-      log.Printf("p01: read line: '%s'\n", line)
-    }
-    i, err = strconv.Atoi(line)
-    if err == nil {
-      result = append(result, i)
-    } else {
-      return result, err
-    }
-    line_bytes, shortRead, err = bufreader.ReadLine()
-  }
-  if shortRead {
-    err = errors.New("short read!")
-  }
-  if err == io.EOF {
-    err = nil
-  }
-  return result, err
-}
-
-func ReadNumbersFromFile(path string, verbose bool) ([]int, error) {
-  file, err := os.Open(path)
-  if err != nil {
-    return nil, err
-  }
-  defer file.Close()
-  return ReadNumbers(file, verbose)
 }
 
 func LogNumbers(input []int) {
@@ -175,7 +135,7 @@ func Main(input_path string, verbose bool, args []string) (error) {
   // Read the input.
   var input []int
   var err error
-  input, err = ReadNumbersFromFile(input_path, verbose)
+  input, err = util.ReadNumbersFromFile(input_path)
   if verbose {
     LogNumbers(input)
   }

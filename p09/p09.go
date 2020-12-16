@@ -1,12 +1,8 @@
 package p09
 
 import (
-  "io"
-  "os"
-  "bufio"
   "fmt"
   "errors"
-  "strconv"
   "github.com/fritzr/advent2020/util"
   "github.com/fritzr/advent2020/p01"
 )
@@ -57,42 +53,33 @@ func (v *XMASValidator) Read(value int) error {
   return nil
 }
 
-func ReadXMAS(input io.Reader, ringSize int) (int, error) {
-  scanner := bufio.NewScanner(input)
-  scanner.Split(bufio.ScanLines)
-  validator := NewXMASValidator(ringSize)
-  for scanner.Scan() {
-    value, err := strconv.Atoi(scanner.Text())
-    if err != nil {
-      return value, err
-    }
-    if err = validator.Read(value); err != nil {
-      return value, err
-    }
-  }
-  return -1, scanner.Err()
-}
-
-func ReadXMASFromFile(path string, ringSize int) (int, error) {
-  file, err := os.Open(path)
-  if err != nil {
-    return 0, err
-  }
-  defer file.Close()
-  return ReadXMAS(file, ringSize)
-}
-
 func Main(input_path string, verbose bool, args []string) error {
   gVerbose = verbose
-  firstInvalid, err := ReadXMASFromFile(input_path, 25)
-  if err != nil && err != BadXMASValue {
+  data, err := util.ReadNumbersFromFile(input_path)
+  if err != nil {
     return err
   }
 
-  // Part1: expecting a bad value
-  if err == BadXMASValue {
-    fmt.Printf("First bad value was %d\n", firstInvalid)
+  // Validate the input, first of all.
+  validator := NewXMASValidator(25)
+  var value int
+  for _, value = range data {
+    err = validator.Read(value)
+    if err != nil {
+      break
+    }
   }
+
+  // Part 1: expecting a bad value.
+  if err == BadXMASValue {
+    fmt.Printf("First bad value was %d\n", value)
+  } else if err == nil {
+    return errors.New("all numbers were unexpectedly valid!")
+  } else {
+    return err
+  }
+
+  // Part 2: find a contiguous sequence of numbers which sum to the bad value.
 
   return nil
 }
