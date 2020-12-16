@@ -216,8 +216,8 @@ func Main(input_path string, verbose bool, args []string) error {
     if err = VerifySum(window, sum); err != nil {
       return err
     }
-    min := util.IMin(window)
-    max := util.IMax(window)
+    _, min := util.IMin(window)
+    _, max := util.IMax(window)
     fmt.Printf("  min=%d, max=%d, min + max=%d\n", min, max, min + max)
   } else {
     return errors.New(fmt.Sprintf(

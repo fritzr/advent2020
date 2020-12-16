@@ -100,26 +100,30 @@ func IAbs(i int) int {
   return i
 }
 
-func IMin(numbers []int) int {
-  if len(numbers) == 0 { return 0 }
+func IMin(numbers []int) (int, int) {
+  if len(numbers) == 0 { return -1, 0 }
   min := numbers[0]
+  var min_idx int
   for idx := 1; idx < len(numbers); idx++ {
     if numbers[idx] < min {
+      min_idx = idx
       min = numbers[idx]
     }
   }
-  return min
+  return min_idx, min
 }
 
-func IMax(numbers []int) int {
-  if len(numbers) == 0 { return 0 }
+func IMax(numbers []int) (int, int) {
+  if len(numbers) == 0 { return -1, 0 }
   max := numbers[0]
+  var max_idx int
   for idx := 1; idx < len(numbers); idx++ {
     if numbers[idx] > max {
+      max_idx = idx
       max = numbers[idx]
     }
   }
-  return max
+  return max_idx, max
 }
 
 func StringIsSubset(subset string, superset string) bool {
