@@ -12,14 +12,13 @@ import (
   "github.com/fritzr/advent2020/util"
 )
 
-
-// Part 1
-func NumbersSummingTo(input []int, sum int) (int, int, error) {
-  table := make([]int, sum, sum)
+func NumbersSummingToIter(sum int, Next func() bool, Get func() int) (int, int, error) {
+  table := make(map[int]int)
 
   // Once we see one number, we know the other number which sums with it.
   // Mark both once; when a number is marked twice, it and its pair sum to 2020.
-  for _, value := range input {
+  for Next() {
+    value := Get()
     if value < sum {
       other_value := sum - value
       if table[other_value] > 0 {
@@ -31,6 +30,14 @@ func NumbersSummingTo(input []int, sum int) (int, int, error) {
     }
   }
   return 0, 0, errors.New(fmt.Sprintf("no values sum to %d", sum))
+}
+
+// Part 1
+func NumbersSummingTo(input []int, sum int) (int, int, error) {
+  idx := -1
+  return NumbersSummingToIter(sum,
+    func() bool { idx++; return idx < len(input) },
+    func() int { return input[idx] })
 }
 
 // Part 2: N numbers (depth) from I which sum to S
