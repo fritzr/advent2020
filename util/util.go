@@ -93,6 +93,13 @@ func Product(numbers []int) int {
   return result
 }
 
+func IAbs(i int) int {
+  if i < 0 {
+    i *= -1
+  }
+  return i
+}
+
 func StringIsSubset(subset string, superset string) bool {
   return 0 > strings.IndexFunc(subset, func(r rune) bool {
     return strings.IndexRune(superset, r) < 0 })

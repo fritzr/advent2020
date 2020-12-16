@@ -7,6 +7,7 @@ import (
   "bufio"
   "strconv"
   "errors"
+  "github.com/fritzr/advent2020/util"
 )
 
 var gVerbose = false
@@ -234,16 +235,9 @@ func (b *Boat) Str() string {
     b.LatStr(), b.LongStr(), b.HeadStr())
 }
 
-func IAbs(i int) int {
-  if i < 0 {
-    i *= -1
-  }
-  return i
-}
-
 // Distance in the L1 norm (Manhattan distance) from a point.
 func (b *Boat) L1Distance(fromLat int, fromLong int) int {
-  return IAbs(b.lat - fromLat) + IAbs(b.long - fromLong)
+  return util.IAbs(b.lat - fromLat) + util.IAbs(b.long - fromLong)
 }
 
 func ReadDirections(input io.Reader) ([]Direction, error) {
