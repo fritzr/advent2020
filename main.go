@@ -79,7 +79,7 @@ func main() {
       log.Fatal("missing argument to -i")
     }
     input = args[1]
-    args = args[1:]
+    args = args[2:]
   }
 
   // Run the selected puzzle. Pass additional arguments.
