@@ -70,3 +70,115 @@ func StringIsSubset(subset string, superset string) bool {
   return 0 > strings.IndexFunc(subset, func(r rune) bool {
     return strings.IndexRune(superset, r) < 0 })
 }
+
+// Rotate an index around in a ring by a positive or negative value.
+//
+// The result is always positive and less than length.
+func Rotate(index int, by int, length int) int {
+  if by < 0 {
+    index += (by % length)
+    if index < 0 {
+      index += length
+    }
+  } else {
+    index = (index + by) % length
+  }
+  return index
+}
+
+// Like a ring.Ring, but uses an array buffer rather than a linked list.
+type RingBuffer struct {
+  _data []interface{}
+
+  // Points to the tail, i.e. the last (most recently inserted) element.
+  //
+  // The head, i.e. first (least recently inserted) is at (_tail + 1) % Len().
+  _tail int
+}
+
+func NewRingBuffer(size int) *RingBuffer {
+  r := new(RingBuffer)
+  r._data = make([]interface{}, size)
+  r._tail = size - 1
+  return r
+}
+
+func (r *RingBuffer) rotated(n int) int {
+  return Rotate(r._tail, n, r.Len())
+}
+
+func (r *RingBuffer) head() int {
+  return r.rotated(1)
+}
+
+func (r *RingBuffer) tail() int {
+  return r._tail
+}
+
+func (r *RingBuffer) Push(value interface{}) *RingBuffer {
+  r.Move(1)
+  r._data[r.tail()] = value
+  return r
+}
+
+func (r *RingBuffer) Pop() interface{} {
+  result := r._data[r.tail()]
+  r.Move(-1)
+  return result
+}
+
+// Return the most recently inserted (last) element.
+func (r *RingBuffer) Last() interface{} {
+  return r._data[r.tail()]
+}
+
+// Return the least recently inserted (first) element.
+func (r *RingBuffer) First() interface{} {
+  return r._data[r.head()]
+}
+
+func (r *RingBuffer) Len() int {
+  return len(r._data)
+}
+
+// Move n % r.Len() elements backward (n < 0) or forward (n >= 0).
+func (r *RingBuffer) Move(n int) *RingBuffer {
+  r._tail = r.rotated(n)
+  return r
+}
+
+// Get the n-th least recently used element.
+//
+// For example, Get(0) === First(),
+// and Get(-1) === Get(Len()-1) === Last().
+func (r *RingBuffer) Get(n int) interface{} {
+  return r._data[Rotate(r.head(), n, r.Len())]
+}
+
+// Get the n-th most recently used element.
+//
+// For example, GetLast(0) == Last(),
+// and Getlast(-1) === GetLast(Len()-1) === First().
+func (r *RingBuffer) GetLast(n int) interface{} {
+  return r._data[Rotate(r.tail(), -n, r.Len())]
+}
+
+// Call f on each element of the ring in forward order.
+func (r *RingBuffer) Do(f func(interface{})) {
+  // Do the head, then wrap around until we reach head again.
+  head := r.head()
+  f(r._data[head])
+  for idx := r.rotated(2); idx != head; idx++ {
+    f(r._data[idx])
+  }
+}
+
+// Call f on each element of the ring in forward order so long as f returns true
+func (r *RingBuffer) DoWhile(f func(interface{}) bool) {
+  // Do the head, then wrap around until we reach head again.
+  head := r.head()
+  if f(r._data[head]) {
+    for idx := r.rotated(2); idx != head && f(r._data[idx]); idx++ {
+    }
+  }
+}
