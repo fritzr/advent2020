@@ -100,6 +100,28 @@ func IAbs(i int) int {
   return i
 }
 
+func IMin(numbers []int) int {
+  if len(numbers) == 0 { return 0 }
+  min := numbers[0]
+  for idx := 1; idx < len(numbers); idx++ {
+    if numbers[idx] < min {
+      min = numbers[idx]
+    }
+  }
+  return min
+}
+
+func IMax(numbers []int) int {
+  if len(numbers) == 0 { return 0 }
+  max := numbers[0]
+  for idx := 1; idx < len(numbers); idx++ {
+    if numbers[idx] > max {
+      max = numbers[idx]
+    }
+  }
+  return max
+}
+
 func StringIsSubset(subset string, superset string) bool {
   return 0 > strings.IndexFunc(subset, func(r rune) bool {
     return strings.IndexRune(superset, r) < 0 })
