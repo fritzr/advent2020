@@ -11,34 +11,41 @@ import (
 )
 
 type BusSchedule struct {
-  active []int
-  inactive map[int]bool
+  // List of bus IDs in the same order as the input.
+  buses []int
+  // Map bus ID to constraing position in the schedule.
+  busOffsets map[int]int
 }
 
 func NewBusSchedule(sched string) (*BusSchedule, error) {
   b := new(BusSchedule)
-  b.active = make([]int, 0, 64)
-  b.inactive = make(map[int]bool, 128)
+  b.buses = make([]int, 0, 16)
+  b.busOffsets = make(map[int]int, 16)
   for index, strValue := range strings.Split(sched, ",") {
-    if strValue == "x" {
-      b.inactive[index] = true
-    } else {
-      value, err := strconv.Atoi(strValue)
+    if strValue != "x" {
+      busId, err := strconv.Atoi(strValue)
       if err != nil {
         return nil, err
       }
-      b.active = append(b.active, value)
+      b.buses = append(b.buses, busId)
+      b.busOffsets[busId] = index
     }
   }
   return b, nil
 }
 
 func (b *BusSchedule) NextAvailable(time int) map[int]int {
-  nextAvailable := make(map[int]int, len(b.active))
-  for _, active := range b.active {
-    nextAvailable[active] = active * (1 + time / active)
+  nextAvailable := make(map[int]int, len(b.buses))
+  for _, busId := range b.buses {
+    nextAvailable[busId] = busId * (1 + time / busId)
   }
   return nextAvailable
+}
+
+func (b *BusSchedule) ConstrainedTime() int {
+  // Find the time t for which bus x departs at t + busOffsets[x].
+  // TODO
+  return -1
 }
 
 func ReadSchedule(input io.Reader) (timestamp int, s *BusSchedule, err error) {
@@ -71,6 +78,7 @@ func Main(input_path string, verbose bool, args []string) error {
     return err
   }
 
+  // Part 1: find the earliest bus after the given timestamp.
   earliestBus := -1
   earliestWaitTime := -1
   nextAvailable := schedule.NextAvailable(timestamp)
@@ -90,6 +98,10 @@ func Main(input_path string, verbose bool, args []string) error {
     timestamp, earliestBus, earliestBusTime, earliestWaitTime)
   fmt.Printf("    %d x %d = %d\n",
     earliestBus, earliestWaitTime, earliestBus*earliestWaitTime)
+
+  // Part 2: find timestamp which matches the schedule.
+  constrainedTime := schedule.ConstrainedTime()
+  fmt.Printf("Schedule matches constraints starting at %d.\n", constrainedTime)
 
   return nil
 }
