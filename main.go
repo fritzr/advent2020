@@ -18,6 +18,7 @@ import (
   "github.com/fritzr/advent2020/p08"
   "github.com/fritzr/advent2020/p09"
   "github.com/fritzr/advent2020/p10"
+  "github.com/fritzr/advent2020/p11"
   "github.com/fritzr/advent2020/p12"
 )
 
@@ -61,6 +62,7 @@ func main() {
     case 8: puzzle = p08.Main
     case 9: puzzle = p09.Main
     case 10: puzzle = p10.Main
+    case 11: puzzle = p11.Main
     case 12: puzzle = p12.Main
     }
 
