@@ -51,7 +51,7 @@ func (b *BusSchedule) NextAvailable(time int64) map[int]int64 {
 //   A * n = B * m - O.
 //
 // This function returns n. To obtain T itself, multiply the result by A.
-func offsetMatchN(A int64, B int64, O int64) int64 {
+func offsetMatch(A int64, B int64, O int64) int64 {
   Q := O / A
   O = O % A
 
@@ -69,27 +69,23 @@ func offsetMatchN(A int64, B int64, O int64) int64 {
   r := B % A
 
   // Find a = k * r = O mod A, the first multiple of r congruent to O modulo A.
-  // XXX can we do this mathematically or must we iterate?
-  k := int64(1)
-  a := r
-  for (a % A) != O {
-    a += r
-    k += 1
+  // By definition, there exists some c for which A * c = k * r - O.
+  // Solving for k, we seek the first integer which satisfies k * r = O + A * c
+  // or in other words, (O + A * c) is divisible by r.
+  c := int64(1)
+  C := A
+  for (O + C) % r != 0 {
+    C += A
+    c++
   }
+  // So c := C / A, or C := A * c, and by our formula:
+  k := (O + C) / r
 
-  // Multiply the result by the original quotient of B / A,
-  // then add (a / A) to obtain the first such number divisible by A.
-
-  // Note that we tracked a = r * k already.
-  // The formula for n is n = (B / A) * k + ((r * k) / A).
-  // In other words, A * n = k * (B + r) = B * m + O such that k * r = O mod A.
-  // We also need to subtract Q = O / A in case the requested offset is
-  // larer than the root A.
-  n := q * k + (a / A) - Q
-
-  // Now one could compute m from the definition simply as:
-  // m := (A * n + O) / B
-  return n
+  // Now we have n = |_B / A_| * k + |_B / A_| - |_O / A_|,
+  // or more simply n = q * k + c - Q.
+  // Roughly A * n = B * k + C - O.
+  n := q * k + c - Q
+  return A * n
 }
 
 func (b *BusSchedule) ConstrainedTime() int64 {
@@ -106,7 +102,7 @@ func (b *BusSchedule) ConstrainedTime() int64 {
       fmt.Printf("  %d + %d * n = T\n", t + int64(b.busOffsets[busId]), busId)
       fmt.Printf("===================\n")
     }
-    t += lcm * offsetMatchN(lcm, int64(busId), t + int64(b.busOffsets[busId]))
+    t += offsetMatch(lcm, int64(busId), t + int64(b.busOffsets[busId]))
     lcm *= int64(busId)
   }
 
