@@ -4,8 +4,11 @@ import (
   "fmt"
   "strconv"
   "strings"
+  "errors"
   "github.com/fritzr/advent2020/util"
 )
+
+var gVerbose = false
 
 type pocketDimensionKey uint64
 
@@ -17,7 +20,7 @@ type PocketDimension struct {
   // We could potentially use bitwise ops to embed a custom hash
   cells map[pocketDimensionKey]bool
   ndim int
-  nactive int
+  //nactive int
 
   // The extents {min, max} of coordinates ever activated in each dimension.
   // This will grow monotonically away from zero.
@@ -45,7 +48,7 @@ func pdHash(coords []int, ndim int) pocketDimensionKey {
   for _, coord := range coords[:ndim] {
     magnitude := uint64(util.IAbs(coord))
     if magnitude > ulimit {
-      panic("coordinate too large for current hash")
+      panic(fmt.Sprintf("coordinate %d too large for current hash", magnitude))
     }
     hash |= (magnitude << nshift) & mask
     mask <<= nbits
@@ -87,26 +90,44 @@ func NewPocketDimension(ndim int) *PocketDimension {
   return d
 }
 
+func (d *PocketDimension) isActiveHash(hash pocketDimensionKey) bool {
+  return d.cells[hash]
+}
+
 func (d *PocketDimension) IsActive(coords []int) bool {
-  return d.cells[pdHash(coords, d.ndim)]
+  return d.isActiveHash(pdHash(coords, d.ndim))
+}
+
+func (d *PocketDimension) activateHash(hash pocketDimensionKey) {
+  /*
+  if !d.cells[hash] {
+  */
+    d.cells[hash] = true
+  /*
+    d.nactive++
+  }
+  */
 }
 
 func (d *PocketDimension) Activate(coords []int) {
-  hash := pdHash(coords, d.ndim)
-  if !d.cells[hash] {
-    d.cells[hash] = true
-    d.nactive++
+  d.activateHash(pdHash(coords, d.ndim))
+}
+
+func (d *PocketDimension) deactivateHash(hash pocketDimensionKey) {
+  // Deleting inactive cells makes it far easier to count and iterate over
+  // all active cells, and may help memory usage.
+  /*
+  if d.cells[hash] {
+  */
+    delete(d.cells, hash)
+  /*
+    d.nactive--
   }
+  */
 }
 
 func (d *PocketDimension) Deactivate(coords []int) {
-  // Is deleting too slow?
-  // It makes it far easier to iterate over all active cells.
-  hash := pdHash(coords, d.ndim)
-  if d.cells[hash] {
-    delete(d.cells, hash)
-    d.nactive--
-  }
+  d.deactivateHash(pdHash(coords, d.ndim))
 }
 
 func SliceEqual(s1 []int, s2 []int) bool {
@@ -126,35 +147,35 @@ func SliceEqual(s1 []int, s2 []int) bool {
 // forms the adjacent hyperplanes.
 //
 // In the base case, all coordinates are fixed and we can check if it is active.
-func (d *PocketDimension) countActive(origin []int, fixedCoords []int) int {
-  var count int
+func (d *PocketDimension) visitPartialNeighbors(origin []int,
+                                                fixedCoords []int,
+                                                f func(coords []int)) {
   if len(origin) == len(fixedCoords) {
-    if !SliceEqual(origin, fixedCoords) && d.IsActive(fixedCoords) {
-      return 1
+    if !SliceEqual(origin, fixedCoords) {
+      f(fixedCoords)
     }
-    return 0
   } else {
     varyCoord := origin[len(fixedCoords)]
     fixedCoords = append(fixedCoords, varyCoord - 1)
     lastIndex := len(fixedCoords)-1
 
     // fixedCoords[lastIndex] = varyCoord - 1
-    count += d.countActive(origin, fixedCoords)
+    d.visitPartialNeighbors(origin, fixedCoords, f)
     fixedCoords[lastIndex] = varyCoord
-    count += d.countActive(origin, fixedCoords)
+    d.visitPartialNeighbors(origin, fixedCoords, f)
     fixedCoords[lastIndex] = varyCoord + 1
-    count += d.countActive(origin, fixedCoords)
+    d.visitPartialNeighbors(origin, fixedCoords, f)
   }
-  return count
 }
 
-// Count active neighbors.
-// We need to visit every adjacent cell.
-func (d *PocketDimension) ActiveNeighbors(coords []int) int {
-  return d.countActive(coords, []int{})
+// Visit neighbor (adjacent) cells.
+//
+// Does not visit the origin cell itself.
+func (d *PocketDimension) VisitNeighbors(coords []int, f func(coords []int)) {
+  d.visitPartialNeighbors(coords, []int{}, f)
 }
 
-// Visit active cells in no particular order.
+// Visit all active cells in no particular order.
 func (d *PocketDimension) VisitActive(f func(coords []int)) {
   for hash, active := range d.cells {
     // assert(active) -- enforced by Deactivate()
@@ -164,13 +185,132 @@ func (d *PocketDimension) VisitActive(f func(coords []int)) {
   }
 }
 
+func (d *PocketDimension) ActiveNeighbors(coords []int) int {
+  count := 0
+  d.VisitNeighbors(coords, func(neighbor []int) {
+    if d.IsActive(neighbor) {
+      count += 1
+    }
+  })
+  return count
+}
+
+func coordStr(coords []int) string {
+  var s strings.Builder
+  s.WriteByte('(')
+  for _, coord := range coords[:len(coords)-1] {
+    s.WriteString(strconv.Itoa(coord))
+    s.WriteByte(',')
+  }
+  s.WriteString(strconv.Itoa(coords[len(coords)-1]))
+  s.WriteByte(')')
+  return s.String()
+}
+
 // Simulate one cycle.
 func (d *PocketDimension) Simulate() {
-  // TODO
+  const STABLE = 1
+  const ACTIVATE = 2
+  const DEACTIVATE = 3
+
+  // To avoid infinite recursion, we mark PENDING every node before we visit
+  // its neighbors.
+  const PENDING = 4
+
+  // Store instructions for every cell we end up visiting.
+  // These are all executed once after we visit the cells.
+  exec := make(map[pocketDimensionKey]int)
+
+  var stateStr func(int) string
+  if gVerbose {
+    stateStr = func(state int) string {
+      return []string{"NONE", "STABLE", "ACTIVE", "INACTIVE", "PENDING"}[state]
+    }
+  }
+
+  // Visit every active cell and their neighbors.
+  // Though there are infinitely many cells, only active cells and the
+  // inactive cells adjacent to them can ever change state.
+  // We must be very careful not to infinitely recurse.
+  d.VisitActive(func(active []int) {
+    activeHash := pdHash(active, d.ndim)
+    // Only process this cell if we haven't already processed it.
+    if exec[activeHash] == 0 {
+      exec[activeHash] = PENDING
+
+      if gVerbose {
+        fmt.Printf("  visiting   active %s (hash=%x)\n", coordStr(active), activeHash)
+      }
+
+      // Count active neighbors of the active cell.
+      activeN := 0
+      d.VisitNeighbors(active, func(n []int) {
+        nHash := pdHash(n, d.ndim)
+        if d.isActiveHash(nHash) {
+          activeN++
+        }
+
+        // While we're at it, visit any inactive neighbor cell n (once).
+        if exec[nHash] == 0 && !d.isActiveHash(nHash) {
+          exec[nHash] = PENDING
+
+          if gVerbose {
+            fmt.Printf("    visiting inactive %s (hash=%x)\n",
+              coordStr(n), nHash)
+          }
+
+          // To do that, count each active neighbor m of n.
+          nN := 0
+          d.VisitNeighbors(n, func(m []int) {
+            if d.IsActive(m) {
+              nN++
+            }
+          })
+          // Inactive cells activate with exactly three neighbors.
+          if nN == 3 {
+            exec[nHash] = ACTIVATE
+          } else {
+            exec[nHash] = STABLE
+          }
+          if gVerbose {
+            fmt.Printf("    ... %x state: inactive => %s (n=%d)\n",
+              nHash, stateStr(exec[nHash]), nN)
+          }
+        }
+      })
+
+      // Active cells only remain active with 2 or 3 active neighbors.
+      if activeN != 2 && activeN != 3 {
+        exec[activeHash] = DEACTIVATE
+      } else {
+        exec[activeHash] = STABLE
+      }
+      if gVerbose {
+        fmt.Printf("  ... %x state: active => %s (n=%d)\n",
+          activeHash, stateStr(exec[activeHash]), activeN)
+      }
+    }
+  })
+
+  // Now we have a set of instructions to execute. Do it.
+  //
+  // We use panics as assertions to indicate such a state is not possible.
+  for hash, state := range exec {
+    switch state {
+    case STABLE: // Do nothing.
+    case ACTIVATE:
+      if d.isActiveHash(hash) { panic("activating an active cell!") }
+      d.activateHash(hash)
+    case DEACTIVATE:
+      if !d.isActiveHash(hash) { panic("deactivating an inactive cell!") }
+      d.deactivateHash(hash)
+    case PENDING: panic("cell state was not resolved!")
+    }
+  }
 }
 
 func (d *PocketDimension) ActiveCount() int {
-  return d.nactive
+  return len(d.cells)
 }
 
 func (d *PocketDimension) GetExtents() [][2]int {
@@ -198,19 +338,40 @@ func (d *PocketDimension) ActiveStr() string {
       s.WriteString("\n")
       nLine = 0
     }
-    s.WriteString("  (")
-    for _, coord := range coords[:len(coords)-1] {
-      s.WriteString(strconv.Itoa(coord))
-      s.WriteByte(',')
-    }
-    s.WriteString(strconv.Itoa(coords[len(coords)-1]))
-    s.WriteString(")")
+    s.WriteString("  ")
+    s.WriteString(coordStr(coords))
     nLine += 1
   })
   return s.String()
 }
 
+func Usage() {
+  fmt.Println("usage: advent2020 17 [main opts...] [-n N]")
+  fmt.Println("")
+  fmt.Println("If N is given, run N iterations of the simulation (default 6).")
+}
+
 func Main(input_path string, verbose bool, args []string) error {
+  gVerbose = verbose
+
+  iterations := 6
+  if len(args) > 0 {
+    if args[0] == "-h" || args[0] == "--help" {
+      Usage()
+      return nil
+    }
+    if args[0] == "-n" {
+      if len(args) < 2 {
+        return errors.New("-n requires an argument")
+      }
+      var err error
+      iterations, err = strconv.Atoi(args[1])
+      if err != nil {
+        return err
+      }
+    }
+  }
+
   lines, err := util.ReadLinesFromFile(input_path)
   if err != nil {
     return err
@@ -226,17 +387,24 @@ func Main(input_path string, verbose bool, args []string) error {
     }
   }
   fmt.Printf("There are initially %d active cells.\n", dim.ActiveCount())
+
   if verbose {
     fmt.Println(dim.ActiveStr())
+    fmt.Println("Extents:")
+    for dimNum, extents := range dim.GetExtents() {
+      fmt.Printf("  (dim%d) [min=%d, max=%d]\n", dimNum, extents[0], extents[1])
+    }
   }
 
   // Simulate 6 times and count active cells.
-  const nSteps = 6
-  for n := 0; n < nSteps; n++ {
+  for n := 0; n < iterations; n++ {
     dim.Simulate()
+    if verbose {
+      fmt.Printf("After step %d, actives are:\n%s\n", n + 1, dim.ActiveStr())
+    }
   }
   fmt.Printf("After %d steps, there are %d active cells.\n",
-    nSteps, dim.ActiveCount())
+    iterations, dim.ActiveCount())
 
   return nil
 }
