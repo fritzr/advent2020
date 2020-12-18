@@ -61,7 +61,7 @@ func pdHash(coords []int, ndim int) pocketDimensionKey {
 
 func signDecode(magnitude uint64, signBitPos int) int {
   if magnitude & (1 << signBitPos) != 0 {
-    return -int(magnitude)
+    return -int(magnitude &^ (1 << signBitPos))
   }
   return int(magnitude)
 }
@@ -75,7 +75,7 @@ func pdRHash(hash pocketDimensionKey, ndim int) (coords []int) {
   nshift := 0
   uHash := uint64(hash)
   for index := 0; index < ndim; index++ {
-    coords[index] = signDecode((uHash & mask) >> nshift, nshift + nbits - 1)
+    coords[index] = signDecode((uHash & mask) >> nshift, nbits - 1)
     mask <<= nbits
     nshift += nbits
   }
