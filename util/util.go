@@ -119,6 +119,14 @@ func Product(numbers []int) int {
   return result
 }
 
+func IPow(root int, exp int) int {
+  root = 1
+  for n := 0; n < exp; n++ {
+    root *= exp
+  }
+  return root
+}
+
 func IAbs(i int) int {
   if i < 0 {
     i *= -1
