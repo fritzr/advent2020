@@ -309,6 +309,15 @@ func (d *PocketDimension) Simulate() {
   }
 }
 
+func (d *PocketDimension) SimulateN(steps int) {
+  for step := 0; step < steps; step++ {
+    d.Simulate()
+    if gVerbose {
+      fmt.Printf("After step %d, actives are:\n%s\n", step + 1, d.ActiveStr())
+    }
+  }
+}
+
 func (d *PocketDimension) ActiveCount() int {
   return len(d.cells)
 }
@@ -326,6 +335,19 @@ func (d *PocketDimension) GetExtents() [][2]int {
     }
   })
   return extents
+}
+
+func (d *PocketDimension) ActivatePlane(plane []string) {
+  for rowCoord, line := range plane {
+    for colCoord, c := range []byte(line) {
+      if c != '.' {
+        coord := make([]int, d.ndim)
+        coord[0] = rowCoord
+        coord[1] = colCoord
+        d.Activate(coord)
+      }
+    }
+  }
 }
 
 // String representation for debugging.
@@ -379,13 +401,7 @@ func Main(input_path string, verbose bool, args []string) error {
 
   // Part 1: Activate cells from the plane specified in the input.
   dim := NewPocketDimension(3)
-  for rowCoord, line := range lines {
-    for colCoord, c := range []byte(line) {
-      if c != '.' {
-        dim.Activate([]int{rowCoord, colCoord, 0})
-      }
-    }
-  }
+  dim.ActivatePlane(lines)
   fmt.Printf("There are initially %d active cells.\n", dim.ActiveCount())
 
   if verbose {
@@ -397,14 +413,19 @@ func Main(input_path string, verbose bool, args []string) error {
   }
 
   // Simulate 6 times and count active cells.
-  for n := 0; n < iterations; n++ {
-    dim.Simulate()
-    if verbose {
-      fmt.Printf("After step %d, actives are:\n%s\n", n + 1, dim.ActiveStr())
-    }
-  }
+  dim.SimulateN(iterations)
   fmt.Printf("After %d steps, there are %d active cells.\n",
     iterations, dim.ActiveCount())
+
+  // Part 2: Four dimensions!
+  dim4 := NewPocketDimension(4)
+  dim4.ActivatePlane(lines)
+  fmt.Printf("4 dimensions: There are initially %d active cells.\n",
+    dim4.ActiveCount())
+  dim4.SimulateN(iterations)
+  fmt.Printf("4 dimensions: After %d steps, there are %d active cells.\n",
+    iterations, dim4.ActiveCount())
+
 
   return nil
 }
