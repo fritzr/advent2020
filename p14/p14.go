@@ -5,21 +5,141 @@ import (
   "errors"
   "strings"
   "strconv"
+  "math/bits"
   "github.com/fritzr/advent2020/util"
 )
 
+var gVerbose = false
+
+type BitMemory interface {
+  Write(address uint64, value uint64, setMask uint64, clrMask uint64)
+  Sum() uint64
+  Addresses() uint64
+}
+
+func sumStore(store map[uint64]uint64) uint64 {
+  var sum uint64
+  for _, value := range store {
+    sum += value
+  }
+  return sum
+}
+
+// Flat sparse memory.
+//
+// Writes will mask the value being written.
+type FlatMemory struct {
+  store map[uint64]uint64
+}
+
+func NewFlatMemory() *FlatMemory {
+  m := new(FlatMemory)
+  m.store = make(map[uint64]uint64)
+  return m
+}
+
+func (m *FlatMemory) Write(addr uint64, value uint64, set uint64, clr uint64) {
+  m.store[addr] = (value | set) &^ clr
+}
+
+func (m *FlatMemory) Sum() uint64 {
+  return sumStore(m.store)
+}
+
+func (m *FlatMemory) Addresses() uint64 {
+  return uint64(len(m.store))
+}
+
+// Floating-address sparse memory.
+//
+// Writes will mask the address, potentially causing writes to many addresses.
+// The don't-care bits cause the address to assume all possible combinations.
+type FloatMemory struct {
+  // To be general we can't do something cheeky like storing the mask as
+  // a string and only expanding the addresses at Sum() time, because writes
+  // to "different" addresses may cover the same address. For example,
+  // writing "0b0*x1" and "0b0*0x" will both write to address 0b11.
+  store map[uint64]uint64
+  width int
+}
+
+func NewFloatMemory(maskWidth int) *FloatMemory {
+  m := new(FloatMemory)
+  m.store = make(map[uint64]uint64)
+  m.width = maskWidth
+  return m
+}
+
+func (m *FloatMemory) writeAll(addr uint64, value uint64, xBits []int) {
+  if len(xBits) == 0 {
+    if gVerbose {
+      fmt.Printf("Writing %#x to %#x\n", value, addr)
+    }
+    m.store[addr] = value
+  } else {
+    nextBit := uint64(1 << xBits[0])
+    nextBits := xBits[1:]
+    if gVerbose {
+      fmt.Printf(".. clearing %#x\n", nextBit)
+    }
+    m.writeAll(addr &^ nextBit, value, nextBits)
+    if gVerbose {
+      fmt.Printf(".. setting %#x\n", nextBit)
+    }
+    m.writeAll(addr | nextBit, value, nextBits)
+  }
+}
+
+func (m *FloatMemory) Write(addr uint64, value uint64, set uint64, clr uint64) {
+  // Don't care mask.
+  fullMask := uint64((1 << m.width) - 1)
+  set &= fullMask
+  clr &= fullMask
+  dontCare := fullMask &^ (set | clr)
+  // Expand the write to all referenced addresses.
+  xIndexes := make([]int, 0, m.width)
+  var nshift int
+  for dontCare != 0 && len(xIndexes) < m.width {
+    bitIndex := bits.TrailingZeros64(dontCare)
+    xIndexes = append(xIndexes, bitIndex + nshift)
+    dontCare >>= bitIndex + 1
+    nshift += bitIndex + 1
+  }
+  if gVerbose {
+    fmt.Printf("write(%#x(%d), %#x(%d), %#x, %#x)",
+      addr, addr, value, value, set, clr)
+  }
+  // We no longer clear according to the clear mask.
+  addr |= set
+  if gVerbose {
+    fmt.Printf(" (masked=%#x(%d))\n", addr, addr)
+    fmt.Printf("  Indexes = ")
+    util.PrintArrayInline(xIndexes)
+    fmt.Println()
+  }
+  m.writeAll(addr, value, xIndexes)
+}
+
+func (m *FloatMemory) Sum() uint64 {
+  return sumStore(m.store)
+}
+
+func (m *FloatMemory) Addresses() uint64 {
+  return uint64(len(m.store))
+}
+
+// Bit system.
+//
+// Can execute simple instructions such as INSN_WRITE and INSN_MASK.
+// The backing Memory decides what to do with the current mask on writes.
 type BitSystem struct {
   setMask uint64
   clrMask uint64
-  mem map[uint64]uint64
-}
-
-func (s *BitSystem) Mask(value uint64) uint64 {
-  return (value | s.setMask) &^ s.clrMask
+  mem interface{BitMemory}
 }
 
 func (s *BitSystem) Write(address uint64, value uint64) {
-  s.mem[address] = s.Mask(value)
+  s.mem.Write(address, value, s.setMask, s.clrMask)
 }
 
 func (s *BitSystem) SetMask(setMask uint64, clrMask uint64) {
@@ -46,16 +166,12 @@ func (s *BitSystem) ExecAll(insns []BitInsn) error {
 }
 
 func (s *BitSystem) MemorySum() uint64 {
-  var sum uint64
-  for _, value := range s.mem {
-    sum += value
-  }
-  return sum
+  return s.mem.Sum()
 }
 
-func NewBitSystem() *BitSystem {
+func NewBitSystem(memory interface{BitMemory}) *BitSystem {
   s := new(BitSystem)
-  s.mem = make(map[uint64]uint64)
+  s.mem = memory
   return s
 }
 
@@ -90,12 +206,13 @@ func parseMask(maskStr string) (setMask uint64, clrMask uint64, err error) {
   return setMask, clrMask, err
 }
 
-func parseInsns(lines []string) ([]BitInsn, error) {
+func parseInsns(lines []string) ([]BitInsn, int, error) {
   fieldList := make([]BitInsn, 0, len(lines))
+  var maskWidth int
   for _, line := range lines {
     fields := strings.Split(line, " = ")
     if len(fields) != 2 {
-      return fieldList, errors.New(
+      return fieldList, 0, errors.New(
         fmt.Sprintf("wrong number of fields for instruction '%s'", line))
     }
     // Memory write: mem[INDEX] = VALUE
@@ -103,46 +220,70 @@ func parseInsns(lines []string) ([]BitInsn, error) {
       indexStr := fields[0][4:len(fields[0])-1]
       index, err := strconv.Atoi(indexStr)
       if err != nil {
-        return fieldList, err
+        return fieldList, 0, err
       }
       value, err := strconv.Atoi(fields[1])
       fieldList = append(fieldList,
         BitInsn{INSN_WRITE, uint64(index), uint64(value)})
     } else if fields[0] == "mask" {
       // Mask update: mask = XXXXX1XXX0XX...
+      if len(fields[1]) > maskWidth {
+        maskWidth = len(fields[1])
+      }
       setMask, clrMask, err := parseMask(fields[1])
       if err != nil {
-        return fieldList, err
+        return fieldList, 0, err
       }
       fieldList = append(fieldList,
         BitInsn{INSN_MASK, setMask, clrMask})
     } else {
-      return fieldList, errors.New(
+      return fieldList, 0, errors.New(
         fmt.Sprintf("unrecognized mnemonic '%s'", fields[0]))
     }
   }
-  return fieldList, nil
+  return fieldList, maskWidth, nil
+}
+
+func doExec(sys *BitSystem, insns []BitInsn) error {
+  err := sys.ExecAll(insns)
+  if err != nil {
+    return err
+  }
+
+  fmt.Printf("The sum of %d memory words is %d.\n",
+    sys.mem.Addresses(), sys.MemorySum())
+  return nil
 }
 
 func Main(input_path string, verbose bool, args []string) error {
+  gVerbose = verbose
   lines, err := util.ReadLinesFromFile(input_path)
   if err != nil {
     return err
   }
 
-  insns, err2 := parseInsns(lines)
+  insns, maskWidth, err2 := parseInsns(lines)
   if err2 != nil {
     return err2
   }
 
-  s := NewBitSystem()
-  err = s.ExecAll(insns)
+  // Part 1: standard flat memory.
+  flat := NewFlatMemory()
+  s1 := NewBitSystem(flat)
+  fmt.Printf("Flat memory: ")
+  err = doExec(s1, insns)
   if err != nil {
     return err
   }
 
-  fmt.Printf("After all %d instructions, the sum in memory is %d.\n",
-    len(insns), s.MemorySum())
+  // Part 2: special floating-address memory.
+  floating := NewFloatMemory(maskWidth)
+  s2 := NewBitSystem(floating)
+  fmt.Printf("Floating memory: ")
+  err = doExec(s2, insns)
+  if err != nil {
+    return err
+  }
 
   return nil
 }

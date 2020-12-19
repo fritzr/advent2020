@@ -57,6 +57,14 @@ func PrintArray(array []int) {
   }
 }
 
+func PrintArrayInline(array []int) {
+  fmt.Printf("  {")
+  for _, val := range array {
+    fmt.Printf("%d, ", val)
+  }
+  fmt.Printf("}")
+}
+
 func first_not_of(haystack []byte, hay byte) int {
   for idx, c := range haystack {
     if c != hay {
