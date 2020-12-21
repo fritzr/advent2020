@@ -13,10 +13,12 @@ const RULE_LITERAL = 1
 const RULE_ANY = 2
 const RULE_ALL = 3
 
+// One of the RULE_* constants.
 type Rule interface {
-  Type() int // one of the RULE_* constants
+  Type() int
 }
 
+// Match a literal string.
 type Literal struct {
   literal string
 }
@@ -25,16 +27,18 @@ func (r *Literal) Type() int {
   return RULE_LITERAL
 }
 
+// Match a sequence of rules in order.
 type Sequence struct {
-  all []int // index reference to other rules
+  all []int
 }
 
 func (r *Sequence) Type() int {
   return RULE_ALL
 }
 
+// Match any of a set of rules.
 type Selector struct {
-  any []Rule // collection of references to other rules
+  any []Rule
 }
 
 func (r *Selector) Type() int {
@@ -51,45 +55,62 @@ func NewGrammar() *Grammar {
   return g
 }
 
-func (g *Grammar) ruleAcceptsPrefix(rule Rule, text string) (bool, string) {
-  switch rule.Type() {
-    case RULE_LITERAL:
-      // Match literal prefix.
-      literal := rule.(*Literal).literal
-      if strings.HasPrefix(text, literal) {
-        return true, text[len(literal):]
-      }
-      return false, text
+// We support two specific types of recursive rules:
+//   1. B -> A | AB
+//      This means "B matches A 1 or more times".
+//   2. B -> AC | ABC
+//      This means "B matches 1 or more A followed by the same number of C".
 
-    case RULE_ANY:
-      // Match any of a set of other rules.
-      for _, r := range rule.(*Selector).any {
-        valid, suffix := g.ruleAcceptsPrefix(r, text)
-        if valid {
-          return true, suffix
-        }
-      }
-      return false, text
 
-    case RULE_ALL:
-      // Match all sub-rules sequentially.
-      suffix := text
-      valid := false
-      for _, ruleIndex := range rule.(*Sequence).all {
-        valid, suffix = g.ruleAcceptsPrefix(g.rules[ruleIndex], suffix)
-        if !valid {
-          return false, suffix
-        }
-      }
+// This function returns the prefix of text which is matched by repeating
+// the given sequence of rules.
+//func (g *Grammar) ruleAcceptsMany(rules Rule, text string) (bool, string) {
+//}
+
+func (g *Grammar) literal(id int, rule *Literal, text string) (bool, string) {
+  // Match literal prefix.
+  literal := rule.literal
+  if strings.HasPrefix(text, literal) {
+    return true, text[len(literal):]
+  }
+  return false, text
+}
+
+func (g *Grammar) any(id int, rule *Selector, text string) (bool, string) {
+  // Match any of a set of other rules.
+  for _, subRule := range rule.any {
+    valid, suffix := g.ruleAcceptsPrefix(id, subRule, text)
+    if valid {
       return true, suffix
+    }
+  }
+  return false, text
+}
 
-    default:
-      panic("unhandled rule type")
+func (g *Grammar) all(id int, rule *Sequence, text string) (bool, string) {
+  // Match all sub-rules sequentially.
+  suffix := text
+  valid := false
+  for _, ruleIndex := range rule.all {
+    valid, suffix = g.ruleAcceptsPrefix(ruleIndex, g.rules[ruleIndex], suffix)
+    if !valid {
+      return false, suffix
+    }
+  }
+  return true, suffix
+}
+
+func (g *Grammar) ruleAcceptsPrefix(id int, rule Rule, text string) (bool, string) {
+  switch rule.Type() {
+    case RULE_LITERAL: return g.literal(id, rule.(*Literal), text)
+    case RULE_ANY: return g.any(id, rule.(*Selector), text)
+    case RULE_ALL: return g.all(id, rule.(*Sequence), text)
+    default: panic("unhandled rule type")
   }
 }
 
 func (g *Grammar) Accepts(text string) bool {
-  valid, tail := g.ruleAcceptsPrefix(g.rules[0], text)
+  valid, tail := g.ruleAcceptsPrefix(0, g.rules[0], text)
   return valid && tail == ""
 }
 
