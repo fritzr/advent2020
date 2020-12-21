@@ -119,6 +119,17 @@ func ScanLineGroups(data []byte, atEOF bool) (advance int, token []byte, err err
   return advance, token, err
 }
 
+func FieldsToInts(strings []string) (ints []int, err error) {
+  ints = make([]int, len(strings))
+  for index, str := range strings {
+    ints[index], err = strconv.Atoi(str)
+    if err != nil {
+      break
+    }
+  }
+  return ints, err
+}
+
 func Product(numbers []int) int {
   result := numbers[0]
   for _, value := range numbers[1:] {

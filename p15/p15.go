@@ -6,18 +6,8 @@ import (
   "strconv"
   "errors"
   "fmt"
+  "github.com/fritzr/advent2020/util"
 )
-
-func stringsToInts(strings []string) (ints []int, err error) {
-  ints = make([]int, len(strings))
-  for index, str := range strings {
-    ints[index], err = strconv.Atoi(str)
-    if err != nil {
-      break
-    }
-  }
-  return ints, err
-}
 
 func Usage() {
   fmt.Println("usage: advent2020 [main opts...] [-n turns]")
@@ -31,7 +21,8 @@ func Main(input_path string, verbose bool, args []string) error {
     return err
   }
 
-  numbers, err := stringsToInts(strings.Split(strings.Trim(string(data), "\n"), ","))
+  fields := strings.Split(strings.Trim(string(data), "\n"), ",")
+  numbers, err := util.FieldsToInts(fields)
   if err != nil {
     return err
   }
