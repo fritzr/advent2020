@@ -301,15 +301,15 @@ func Main(input_path string, verbose bool, args []string) error {
   // Identify the fields on my ticket(s).
   fmt.Println("My ticket fields:")
   for _, myTicket := range myTickets {
-    departureSum := 0
+    departureProd := 1
     for index, name := range fieldNames {
       myValue := myTicket[index]
       fmt.Printf("  [%2d] %s: %d\n", index, name, myValue)
       if strings.HasPrefix(name, "departure") {
-        departureSum += myValue
+        departureProd *= myValue
       }
     }
-    fmt.Printf("Sum of 'departure' fields: %d\n", departureSum)
+    fmt.Printf("Product of 'departure' fields: %d\n", departureProd)
   }
 
   return nil
