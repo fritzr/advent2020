@@ -57,12 +57,43 @@ func PrintArray(array []int) {
   }
 }
 
-func PrintArrayInline(array []int) {
-  fmt.Printf("  {")
-  for _, val := range array {
-    fmt.Printf("%d, ", val)
+func ArrayString(array []int) string {
+  var ss strings.Builder
+  ss.WriteRune('[')
+  if len(array) > 0 {
+    ss.WriteString(strconv.Itoa(array[0]))
   }
-  fmt.Printf("}")
+  for index := 1; index < len(array); index++ {
+    ss.WriteString(", ")
+    ss.WriteString(strconv.Itoa(array[index]))
+  }
+  ss.WriteRune(']')
+  return ss.String()
+}
+
+func PrintArrayInline(array []int) {
+  fmt.Printf("  %s", ArrayString(array))
+}
+
+type Set map[int]bool
+
+func SetString(s Set) string {
+  var ss strings.Builder
+  ss.WriteRune('{')
+  count := 0
+  for value, _ := range s {
+    ss.WriteString(strconv.Itoa(value))
+    if count != len(s) - 1 {
+      ss.WriteString(", ")
+    }
+    count++
+  }
+  ss.WriteRune('}')
+  return ss.String()
+}
+
+func PrintSet(s Set) {
+  fmt.Printf("  %s", SetString(s))
 }
 
 func first_not_of(haystack []byte, hay byte) int {
@@ -117,6 +148,26 @@ func ScanLineGroups(data []byte, atEOF bool) (advance int, token []byte, err err
   }
 
   return advance, token, err
+}
+
+func ScanInput(input io.Reader, scan bufio.SplitFunc) ([]string, error) {
+  scanner := bufio.NewScanner(input)
+  scanner.Split(scan)
+  result := make([]string, 0)
+  for scanner.Scan() {
+    result = append(result, scanner.Text())
+  }
+  return result, scanner.Err()
+}
+
+func ReadFile(path string, read func(input io.Reader) (interface{}, error)) (
+    interface{}, error) {
+  file, err := os.Open(path)
+  if err != nil {
+    return nil, err
+  }
+  defer file.Close()
+  return read(file)
 }
 
 func FieldsToInts(strings []string) (ints []int, err error) {
