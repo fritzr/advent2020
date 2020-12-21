@@ -109,6 +109,7 @@ func findValidTickets(fields []*TicketField, tickets [][]int) (
     if gVerbose {
       fmt.Printf("[%d] ## %s\n", ticketNumber, util.ArrayString(ticket))
     }
+    allValid := true
     for _, value := range ticket {
       valid := false
       for _, fieldSpec := range fields {
@@ -122,14 +123,19 @@ func findValidTickets(fields []*TicketField, tickets [][]int) (
           fmt.Printf("     %d is invalid for %s\n", value, fieldSpec.name)
         }
       }
-      if valid {
-        validTicketNumbers[ticketNumber] = true
-      } else {
+      if !valid {
+        allValid = false
         if gVerbose {
-          fmt.Printf("Ticket [%d] is invalid\n", ticketNumber)
+          fmt.Printf("[%d] is invalid\n", ticketNumber)
         }
         errorRate += value
       }
+    }
+    if allValid {
+      if gVerbose {
+        fmt.Printf("[%d] is valid\n", ticketNumber)
+      }
+      validTicketNumbers[ticketNumber] = true
     }
   }
   return validTicketNumbers, errorRate
