@@ -57,24 +57,6 @@ func PrintArray(array []int) {
   }
 }
 
-func ArrayString(array []int) string {
-  var ss strings.Builder
-  ss.WriteRune('[')
-  if len(array) > 0 {
-    ss.WriteString(strconv.Itoa(array[0]))
-  }
-  for index := 1; index < len(array); index++ {
-    ss.WriteString(", ")
-    ss.WriteString(strconv.Itoa(array[index]))
-  }
-  ss.WriteRune(']')
-  return ss.String()
-}
-
-func PrintArrayInline(array []int) {
-  fmt.Printf("  %s", ArrayString(array))
-}
-
 type Set map[int]bool
 
 func (s Set) String() string {

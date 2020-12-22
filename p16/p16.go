@@ -107,7 +107,7 @@ func findValidTickets(fields []*TicketField, tickets [][]int) (
   validTicketNumbers = make(util.Set)
   for ticketNumber, ticket := range tickets {
     if gVerbose {
-      fmt.Printf("[%d] ## %s\n", ticketNumber, util.ArrayString(ticket))
+      fmt.Printf("[%d] ## %v\n", ticketNumber, ticket)
     }
     allValid := true
     for _, value := range ticket {
@@ -287,7 +287,7 @@ func Main(input_path string, verbose bool, args []string) error {
   if verbose {
     fmt.Printf("My tickets: ")
     for _, myTicket := range myTickets {
-      fmt.Printf("# %s\n", util.ArrayString(myTicket))
+      fmt.Printf("# %v\n", myTicket)
     }
   }
 

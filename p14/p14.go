@@ -112,10 +112,7 @@ func (m *FloatMemory) Write(addr uint64, value uint64, set uint64, clr uint64) {
   // We no longer clear according to the clear mask.
   addr |= set
   if gVerbose {
-    fmt.Printf(" (masked=%#x(%d))\n", addr, addr)
-    fmt.Printf("  Indexes = ")
-    util.PrintArrayInline(xIndexes)
-    fmt.Println()
+    fmt.Printf(" (masked=%#x(%d))\n  Indexes = %v\n", addr, addr, xIndexes)
   }
   m.writeAll(addr, value, xIndexes)
 }
