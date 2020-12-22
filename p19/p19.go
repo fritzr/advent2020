@@ -67,51 +67,71 @@ func NewGrammar() *Grammar {
 //func (g *Grammar) ruleAcceptsMany(rules Rule, text string) (bool, string) {
 //}
 
-func (g *Grammar) literal(id int, rule *Literal, text string) (bool, string) {
+func (g *Grammar) literal(id int, rule *Literal, text string, index int) []int {
   // Match literal prefix.
   literal := rule.literal
-  if strings.HasPrefix(text, literal) {
-    return true, text[len(literal):]
+  if text[index:index + len(literal)] == literal {
+    return []int{index + len(literal)}
   }
-  return false, text
+  return []int{}
 }
 
-func (g *Grammar) any(id int, rule *Selector, text string) (bool, string) {
+func (g *Grammar) any(id int, rule *Selector, text string, index int) []int {
   // Match any of a set of other rules.
+  valid := make([]int, 0, len(rule.any))
   for _, subRule := range rule.any {
-    valid, suffix := g.prefix(id, subRule, text)
-    if valid {
-      return true, suffix
-    }
+    valid = append(valid, g.all(id, subRule.(*Sequence), text, index)...)
   }
-  return false, text
+  return valid
 }
 
-func (g *Grammar) all(id int, rule *Sequence, text string) (bool, string) {
+func (g *Grammar) all(id int, rule *Sequence, text string, index int) []int {
   // Match all sub-rules sequentially.
-  suffix := text
-  valid := false
+  var suffixes = []int{index}
   for _, ruleIndex := range rule.all {
-    valid, suffix = g.prefix(ruleIndex, g.rules[ruleIndex], suffix)
-    if !valid {
-      return false, suffix
+    suffixes = g.filter(ruleIndex, g.rules[ruleIndex], text, suffixes, g.prefix)
+    // We can stop trying if there are no valid suffixes anymore.
+    if len(suffixes) == 0 {
+      break
     }
   }
-  return true, suffix
+  return suffixes
 }
 
-func (g *Grammar) prefix(id int, rule Rule, text string) (bool, string) {
+func (g *Grammar) filter(id int, rule Rule, text string, suffixes []int,
+    accept func(id int, rule Rule, text string, index int) []int) []int {
+  valid := make([]int, 0)
+  for _, index := range suffixes {
+    // If an suffix has matched the whole text, it is Good.
+    if index >= len(text) {
+      return []int{index}
+    } else {
+      valid = append(valid, accept(id, rule, text, index)...)
+    }
+  }
+  return valid
+}
+
+func (g *Grammar) prefix(id int, rule Rule, text string, index int) []int {
   switch rule.Type() {
-    case RULE_LITERAL: return g.literal(id, rule.(*Literal), text)
-    case RULE_ANY: return g.any(id, rule.(*Selector), text)
-    case RULE_ALL: return g.all(id, rule.(*Sequence), text)
+    case RULE_LITERAL: return g.literal(id, rule.(*Literal), text, index)
+    case RULE_ANY: return g.any(id, rule.(*Selector), text, index)
+    case RULE_ALL: return g.all(id, rule.(*Sequence), text, index)
     default: panic("unhandled rule type")
   }
 }
 
 func (g *Grammar) Accepts(text string) bool {
-  valid, tail := g.prefix(0, g.rules[0], text)
-  return valid && tail == ""
+  suffixes := g.prefix(0, g.rules[0], text, 0)
+  if len(suffixes) == 0 {
+    return false
+  }
+  for _, suffix := range suffixes {
+    if suffix != len(text) {
+      return false
+    }
+  }
+  return true
 }
 
 func (g *Grammar) SetRule(ruleId int, rule Rule) {
