@@ -203,6 +203,7 @@ func Main(input_path string, verbose bool, args []string) error {
     return err
   }
 
+  // Part 1: see how many messages are accepted.
   messages := strings.Split(textGroups[1], "\n")
   valid := 0
   for _, message := range messages {
@@ -210,7 +211,21 @@ func Main(input_path string, verbose bool, args []string) error {
       valid++
     }
   }
-
   fmt.Printf("%d / %d messages are valid.\n", valid, len(messages))
+
+  // Part 2: replace 8 and 11 with some recursive rules.
+  valid = 0
+  g.SetRule(8, &Selector{[]Rule{
+    &Sequence{[]int{42}}, &Sequence{[]int{42, 8}}}})
+  g.SetRule(11, &Selector{[]Rule{
+    &Sequence{[]int{42, 31}}, &Sequence{[]int{42, 11, 31}}}})
+  for _, message := range messages {
+    if g.Accepts(message) {
+      valid++
+    }
+  }
+  fmt.Printf("%d / %d messages are valid with recursive rules.\n",
+    valid, len(messages))
+
   return nil
 }
