@@ -72,7 +72,7 @@ func NewGrammar() *Grammar {
 func (g *Grammar) literal(id int, rule *Literal, text string, index int) []int {
   // Match literal prefix.
   literal := rule.literal
-  if text[index:index + len(literal)] == literal {
+  if index < len(text) && text[index:index + len(literal)] == literal {
     return []int{index + len(literal)}
   }
   return []int{}
@@ -104,12 +104,7 @@ func (g *Grammar) filter(id int, rule Rule, text string, suffixes []int,
     accept func(id int, rule Rule, text string, index int) []int) []int {
   valid := make([]int, 0)
   for _, index := range suffixes {
-    // If an suffix has matched the whole text, it is Good.
-    if index >= len(text) {
-      return []int{index}
-    } else {
-      valid = append(valid, accept(id, rule, text, index)...)
-    }
+    valid = append(valid, accept(id, rule, text, index)...)
   }
   return valid
 }
