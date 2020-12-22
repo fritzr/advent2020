@@ -9,6 +9,8 @@ import (
   "github.com/fritzr/advent2020/util"
 )
 
+var gVerbose = false
+
 const RULE_LITERAL = 1
 const RULE_ANY = 2
 const RULE_ALL = 3
@@ -122,16 +124,29 @@ func (g *Grammar) prefix(id int, rule Rule, text string, index int) []int {
 }
 
 func (g *Grammar) Accepts(text string) bool {
+  if gVerbose {
+    fmt.Printf("**** (len=%d) %s\n", len(text), text)
+  }
   suffixes := g.prefix(0, g.rules[0], text, 0)
-  if len(suffixes) == 0 {
-    return false
-  }
-  for _, suffix := range suffixes {
-    if suffix != len(text) {
-      return false
+  if len(suffixes) > 0 {
+    for _, suffix := range suffixes {
+      if gVerbose {
+        fmt.Printf("    text[:%d] matches (%s).\n", suffix, text[:suffix])
+      }
+      if suffix >= len(text) {
+        if gVerbose {
+          fmt.Println("=> Accepted.")
+        }
+        return true
+      }
     }
+  } else if gVerbose {
+    fmt.Println("    no matches.")
   }
-  return true
+  if gVerbose {
+    fmt.Println("=> Rejected.")
+  }
+  return false
 }
 
 func (g *Grammar) SetRule(ruleId int, rule Rule) {
@@ -204,6 +219,7 @@ func (g *Grammar) ParseRules(rulesText string) error {
 }
 
 func Main(input_path string, verbose bool, args []string) error {
+  gVerbose = verbose
   groups, err := util.ReadFile(input_path,
     func(input io.Reader) (interface{}, error) {
       return util.ScanInput(input, util.ScanLineGroups)
