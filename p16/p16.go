@@ -164,9 +164,9 @@ func identifyFields(fields []*TicketField, tickets [][]int, ticketIndexes util.S
           delete(possibleFieldIndexes[fieldSpec.name], fieldIndex)
           if gVerbose {
             fmt.Printf(
-              "[%d]: %s cannot be [%d] because %d is invalid (now: %s)\n",
+              "[%d]: %s cannot be [%d] because %d is invalid (now: %v)\n",
               ticketNumber, fieldSpec.name, fieldIndex, field,
-              util.SetString(possibleFieldIndexes[fieldSpec.name]))
+              possibleFieldIndexes[fieldSpec.name])
           }
         }
       }
@@ -224,8 +224,8 @@ func identifyFields(fields []*TicketField, tickets [][]int, ticketIndexes util.S
           "no matches for field '%s'\n", fieldName))
       } else {
         errorStr.WriteString(fmt.Sprintf(
-          "multiple (%d) matches for field '%s': %s\n",
-          len(indexes), fieldName, util.SetString(indexes)))
+          "multiple (%d) matches for field '%s': %v\n",
+          len(indexes), fieldName, indexes))
       }
     }
     return fieldNames, errors.New(errorStr.String())

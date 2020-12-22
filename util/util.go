@@ -77,7 +77,7 @@ func PrintArrayInline(array []int) {
 
 type Set map[int]bool
 
-func SetString(s Set) string {
+func (s Set) String() string {
   var ss strings.Builder
   ss.WriteRune('{')
   count := 0
@@ -90,10 +90,6 @@ func SetString(s Set) string {
   }
   ss.WriteRune('}')
   return ss.String()
-}
-
-func PrintSet(s Set) {
-  fmt.Printf("  %s", SetString(s))
 }
 
 func first_not_of(haystack []byte, hay byte) int {
