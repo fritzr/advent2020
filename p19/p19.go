@@ -11,22 +11,11 @@ import (
 
 var gVerbose = false
 
-const RULE_LITERAL = 1
-const RULE_ANY = 2
-const RULE_ALL = 3
-
-// One of the RULE_* constants.
-type Rule interface {
-  Type() int
-}
+type Rule interface { }
 
 // Match a literal string.
 type Literal struct {
   literal string
-}
-
-func (r *Literal) Type() int {
-  return RULE_LITERAL
 }
 
 // Match a sequence of rules in order.
@@ -34,17 +23,9 @@ type Sequence struct {
   all []int
 }
 
-func (r *Sequence) Type() int {
-  return RULE_ALL
-}
-
 // Match any of a set of rules.
 type Selector struct {
   any []Rule
-}
-
-func (r *Selector) Type() int {
-  return RULE_ANY
 }
 
 type Grammar struct {
@@ -110,10 +91,10 @@ func (g *Grammar) filter(id int, rule Rule, text string, suffixes []int,
 }
 
 func (g *Grammar) prefix(id int, rule Rule, text string, index int) []int {
-  switch rule.Type() {
-    case RULE_LITERAL: return g.literal(id, rule.(*Literal), text, index)
-    case RULE_ANY: return g.any(id, rule.(*Selector), text, index)
-    case RULE_ALL: return g.all(id, rule.(*Sequence), text, index)
+  switch r := rule.(type) {
+    case *Literal: return g.literal(id, r, text, index)
+    case *Selector: return g.any(id, r, text, index)
+    case *Sequence: return g.all(id, r, text, index)
     default: panic("unhandled rule type")
   }
 }
