@@ -45,7 +45,6 @@ func (r *Selector) Type() int {
   return RULE_ANY
 }
 
-// It might be better to write a state machine, but RDP is easier.
 type Grammar struct {
   rules map[int]Rule
 }
@@ -63,48 +62,10 @@ func NewGrammar() *Grammar {
 //      This means "B matches 1 or more A followed by the same number of C".
 
 
-// For 1: match 1 or more copies of the sequence.
-func (g *Grammar) many(id int, sequence *Sequence, text string) (bool, string) {
-  // Consume the sequence 1 or more times.
-  valid, suffix := g.all(id, sequence, text)
-  validOnce := valid
-  lastValidSuffix := suffix
-  for valid {
-    lastValidSuffix = suffix
-    valid, suffix = g.all(id, sequence, suffix)
-  }
-  return validOnce, lastValidSuffix
-}
-
-// Match exactly N copies of the sequence.
-func (g *Grammar) matchN(id int, sequence *Sequence, text string, n int) (
-    bool, string) {
-  valid := true
-  suffix := text
-  for ; valid && n > 0; n-- {
-    valid, suffix = g.all(id, sequence, suffix)
-  }
-  return valid, suffix
-}
-
-// For 2:
-// This function returns the prefix of text which is matched by matching
-// some number of copies of lhs followed by the same number of copies of rhs.
-func (g *Grammar) symmetric(id int, lhs *Sequence, rhs *Sequence, text string) (
-    bool, string) {
-  // Incrementally match symmetric patterns of (n*lhs) + (n*rhs) until we get
-  // a match. TODO do we need to get *every* such match?
-  for n := 1; n < len(text) / 2; n++ {
-    lValid, lSuffix := g.matchN(id, lhs, text, n)
-    if lValid {
-      rValid, rSuffix := g.matchN(id, rhs, lSuffix, n)
-      if rValid {
-        return true, rSuffix
-      }
-    }
-  }
-  return false, text
-}
+// This function returns the prefix of text which is matched by repeating
+// the given sequence of rules.
+//func (g *Grammar) ruleAcceptsMany(rules Rule, text string) (bool, string) {
+//}
 
 func (g *Grammar) literal(id int, rule *Literal, text string) (bool, string) {
   // Match literal prefix.
@@ -117,34 +78,6 @@ func (g *Grammar) literal(id int, rule *Literal, text string) (bool, string) {
 
 func (g *Grammar) any(id int, rule *Selector, text string) (bool, string) {
   // Match any of a set of other rules.
-
-  // First, check if the rule forms a recursive relation that we support.
-  recursionPoint := -1
-  lastRule := rule.any[len(rule.any)-1].(*Sequence).all
-  for subIndex, subid := range lastRule {
-    if subid == id {
-      if recursionPoint != -1 {
-        panic("multiple recursion unsupported")
-      }
-      recursionPoint = subIndex
-      // break // commented out so we will check the assertion above
-    }
-  }
-
-  if recursionPoint == len(lastRule) - 1 {
-    // 1. matches many: B -> A | AB
-    return g.many(id, &Sequence{lastRule[:recursionPoint]}, text)
-  } else if recursionPoint > 1 /* && XXX? */{
-    // 2. matches symmetric: B -> AC | ABC
-    return g.symmetric(id, &Sequence{lastRule[:recursionPoint]},
-      &Sequence{lastRule[recursionPoint + 1:]}, text)
-  } else if recursionPoint >= 0 {
-    // This isn't to say we will catch all unsupported recursive relations;
-    // specifically, we will not catch indirect recursion!
-    panic("unsupported recursive relation")
-  }
-
-  // No recursion. Simply try each sub-rule.
   for _, subRule := range rule.any {
     valid, suffix := g.prefix(id, subRule, text)
     if valid {
