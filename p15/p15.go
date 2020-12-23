@@ -9,55 +9,29 @@ import (
   "github.com/fritzr/advent2020/util"
 )
 
+var gVerbose = false
+
 func Usage() {
   fmt.Println("usage: advent2020 [main opts...] [-n turns]")
   fmt.Println()
-  fmt.Println("Run the game for the specified number of turns (default 2020).")
+  fmt.Println("Run the game for the specified number of turns.")
+  fmt.Println("If not given, run once with 2020 turns and once with 30000000.")
 }
 
-func Main(input_path string, verbose bool, args []string) error {
-  data, err := ioutil.ReadFile(input_path)
-  if err != nil {
-    return err
-  }
-
-  fields := strings.Split(strings.Trim(string(data), "\n"), ",")
-  numbers, err := util.FieldsToInts(fields)
-  if err != nil {
-    return err
-  }
-
-  nTurns := 2020
-
-  if len(args) > 0 {
-    if args[0] == "-h" || args[0] == "--help" {
-      Usage()
-      return nil
-    }
-    if args[0] == "-n" {
-      if len(args) < 2 {
-        return errors.New("option -n requires an argument")
-      }
-      nTurns, err = strconv.Atoi(args[1])
-      if err != nil {
-        return err
-      }
-    }
-  }
-
+func RambunctiousRecitation(init []int, rounds int) int {
   // Initialize the age map.
   lastSpoken := make(map[int]int)
-  for turn, startNumber := range numbers {
+  for turn, startNumber := range init {
     lastSpoken[startNumber] = turn + 1 // never assign turn 0
-    if verbose {
+    if gVerbose {
       fmt.Printf("  Turn %4d: %d\n", turn + 1, startNumber)
     }
   }
 
-  last := numbers[len(numbers) - 1]
+  last := init[len(init) - 1]
   next := 0 // assuming the input numbers are all unique
-  for turn := len(lastSpoken) + 1; turn <= nTurns; turn++ {
-    if verbose {
+  for turn := len(lastSpoken) + 1; turn <= rounds; turn++ {
+    if gVerbose {
       fmt.Printf("  Turn %4d: %d\n", turn, next)
     }
     last = next
@@ -70,8 +44,52 @@ func Main(input_path string, verbose bool, args []string) error {
     }
     lastSpoken[last] = turn
   }
+  return last
+}
 
-  fmt.Printf("The %d-th number spoken is %d.\n", nTurns, last)
+func Main(input_path string, verbose bool, args []string) error {
+  gVerbose = verbose
+  data, err := ioutil.ReadFile(input_path)
+  if err != nil {
+    return err
+  }
+
+  fields := strings.Split(strings.Trim(string(data), "\n"), ",")
+  numbers, err := util.FieldsToInts(fields)
+  if err != nil {
+    return err
+  }
+
+  if len(args) > 0 {
+    if args[0] == "-h" || args[0] == "--help" {
+      Usage()
+      return nil
+    }
+    if args[0] == "-n" {
+      if len(args) < 2 {
+        return errors.New("option -n requires an argument")
+      }
+      nTurns, err := strconv.Atoi(args[1])
+      if err != nil {
+        return err
+      }
+
+      // Just do the requested amount.
+      fmt.Printf("The %d-th number spoken is %d.\n", nTurns,
+        RambunctiousRecitation(numbers, nTurns))
+      return nil
+    }
+  }
+
+  // Part 1: 2020 turns
+  nTurns := 2020
+  fmt.Printf("The %d-th number spoken is %d.\n", nTurns,
+    RambunctiousRecitation(numbers, nTurns))
+
+  // Part 2:
+  nTurns = 30000000
+  fmt.Printf("The %d-th number spoken is %d.\n", nTurns,
+    RambunctiousRecitation(numbers, nTurns))
 
   return nil
 }
