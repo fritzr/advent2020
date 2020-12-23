@@ -1,7 +1,6 @@
 package p19
 
 import (
-  "io"
   "fmt"
   "errors"
   "strings"
@@ -196,27 +195,23 @@ func (g *Grammar) ParseRules(rulesText string) error {
 
 func Main(input_path string, verbose bool, args []string) error {
   gVerbose = verbose
-  groups, err := util.ReadFile(input_path,
-    func(input io.Reader) (interface{}, error) {
-      return util.ScanInput(input, util.ScanLineGroups)
-    })
+  groups, err := util.ReadLineGroupsFromFile(input_path)
   if err != nil {
     return err
   }
 
-  textGroups := groups.([]string)
-  if len(textGroups) != 2 {
+  if len(groups) != 2 {
     return errors.New("expected 2 groups in input")
   }
 
   g := NewGrammar()
-  err = g.ParseRules(textGroups[0])
+  err = g.ParseRules(groups[0])
   if err != nil {
     return err
   }
 
   // Part 1: see how many messages are accepted.
-  messages := strings.Split(textGroups[1], "\n")
+  messages := strings.Split(groups[1], "\n")
   valid := 0
   for _, message := range messages {
     if g.Accepts(message) {

@@ -3,7 +3,6 @@ package p04
 import (
   "io"
   "bufio"
-  "os"
   "errors"
   "strings"
   "fmt"
@@ -139,21 +138,16 @@ func ReadPassports(input io.Reader) ([]Passport, error) {
   return passports, scanner.Err()
 }
 
-func ReadPassportsFromFile(path string) ([]Passport, error) {
-  file, err := os.Open(path)
-  if err != nil {
-    return []Passport{}, nil
-  }
-  defer file.Close()
-  return ReadPassports(file)
-}
-
 func Main(input_path string, verbose bool, args []string) error {
-  passports, err := ReadPassportsFromFile(input_path)
+  iPassports, err := util.ReadFile(input_path,
+    func(input io.Reader) (interface{}, error) {
+      return ReadPassports(input)
+    })
   if err != nil {
     return err
   }
 
+  passports := iPassports.([]Passport)
   npresent := 0
   nvalid := 0
   for _, p := range passports {

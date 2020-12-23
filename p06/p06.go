@@ -3,7 +3,6 @@ package p06
 import (
   "io"
   "bufio"
-  "os"
   "fmt"
   "unicode"
   "github.com/fritzr/advent2020/util"
@@ -53,22 +52,16 @@ func ReadResponseGroups(input io.Reader) ([]ResponseGroup, error) {
   return groups, scanner.Err()
 }
 
-func ReadResponseGroupsFromFile(path string) ([]ResponseGroup, error) {
-  file, err := os.Open(path)
-  if err != nil {
-    return nil, err
-  }
-  defer file.Close()
-  return ReadResponseGroups(file)
-}
-
 func Main(input_path string, verbose bool, args []string) error {
-
-  responses, err := ReadResponseGroupsFromFile(input_path)
+  iResponses, err := util.ReadFile(input_path,
+    func(input io.Reader) (interface{}, error) {
+      return ReadResponseGroups(input)
+    })
   if err != nil {
     return err
   }
 
+  responses := iResponses.([]ResponseGroup)
   fmt.Printf("Read responses from %d groups.\n", len(responses))
 
   any_sum := 0

@@ -138,6 +138,17 @@ func ScanInput(input io.Reader, scan bufio.SplitFunc) ([]string, error) {
   return result, scanner.Err()
 }
 
+func ReadLineGroups(input io.Reader) ([]string, error) {
+  return ScanInput(input, ScanLineGroups)
+}
+
+func ReadLineGroupsFromFile(path string) ([]string, error) {
+  result, err := ReadFile(path, func(input io.Reader) (interface{}, error) {
+    return ReadLineGroups(input)
+  })
+  return result.([]string), err
+}
+
 func ReadFile(path string, read func(input io.Reader) (interface{}, error)) (
     interface{}, error) {
   file, err := os.Open(path)
