@@ -20,3 +20,8 @@ Some puzzles accept additional arguments:
 ```sh
 $ go run . 1 --help
 ```
+
+## Dependencies
+
+Everything except day 20 uses only core Go libraries. Day 20 uses `gonum/mat`
+as an excuse for me to learn how Go deals with heavy numeric calculations.
