@@ -62,14 +62,21 @@ func parseTiles(tileStrings []string) (tiles map[int]Tile, err error) {
 
 // Directions.
 const (
-	RIGHT = iota
+	NONE = iota
+	RIGHT
 	UP
 	LEFT
 	DOWN
 )
 
+const HOW = 0
+const NUM_DIRECTIONS = 1 + DOWN
+
 // Reconstitute organizes tiles into a square grid of width `sqrt(len(tiles))`
 // such that adjacent tiles are equal on their borders.
+//
+// Tiles are square and may be reflected vertically or horizontally and rotated
+// in intervals of 90 degrees to obtain a valid arrangement.
 //
 // For example, the following is a valid arrangement of four 4x4 tiles:
 //
@@ -102,15 +109,39 @@ func Reconstitute(tiles map[int]Tile) (order []int, err error) {
 	// The indexes of the value are the constants RIGHT, LEFT, UP, DOWN, etc...
 	// A zero value (we assume no tile has ID zero) means unknown adjancency.
 	// A value of -1 means not adjacent to any tile.
-	type adjacencyList = [4]int
+	type adjacencyList = [NUM_DIRECTIONS]int
 	type adjacencyMap = map[int]adjacencyList
 	adjacent := make(adjacencyMap, len(tiles))
 
 	// We continually visit a random tile, checking all other tiles.
+	//
 	// Each tile is itself square, and thus can be rotated four times
 	// and flipped in two dimensions, providing twelve possible arrangements.
 	// Naively, every arrangement of each tile must be checked with every other
 	// arrangement of every other tile.
+	//
+	// As a first attempt, we'll try a greedy algorithm which accepts any adjacent
+	// pairs which are found immediately. We may need to keep a list of possible
+	// adjacencies and filter them.
+Tile1:
+	for id1, tile1 := range tiles {
+		for direction, adjacentId := range adjacent[id1] {
+			if adjacentId == -1 {
+				for _, arrangement1 := range Arrangements(tile1) {
+					for id2, tile2 := range tiles {
+						for _, arrangement2 := range Arrangements(tile2) {
+							if which := arrangement1.Borders(arrangement2); which != NONE {
+								adjacent[id1][HOW] = arrangement1
+								adjacent[id1][which] = id2
+								break Done
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+Done:
 
 	var _ = adjacent // XXX suppress unused variables for build
 	return
