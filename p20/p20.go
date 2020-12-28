@@ -163,7 +163,7 @@ func IsAdjacent(t1 *Tile, e1 *TileEdge, t2 *Tile, e2 *TileEdge) bool {
 }
 
 type Adjacency = [2]TileEdge
-type AdjacencyList = []*Adjacency
+type AdjacencyList = []Adjacency
 type AdjacencyMap = map[int]AdjacencyList
 
 // Reconstitute organizes tiles into a square grid of width `sqrt(len(tiles))`
@@ -198,7 +198,7 @@ type AdjacencyMap = map[int]AdjacencyList
 //   .#.|#  #|#.#
 //   ..#|.  .|.#.
 //
-func Reconstitute(tiles map[int]*Tile) (order []int, err error) {
+func Adjacencies(tiles map[int]*Tile) AdjacencyMap {
 	// Map tile IDs to their adjacent tiles (by ID).
 	// The indexes of the value are the constants RIGHT, LEFT, UP, DOWN, etc...
 	// A zero value (we assume no tile has ID zero) means unknown adjancency.
@@ -242,11 +242,11 @@ func Reconstitute(tiles map[int]*Tile) (order []int, err error) {
 								if _, ok := adjacent[id1]; !ok {
 									adjacent[id1] = make(AdjacencyList, 0, len(tiles)-1)
 								}
-								adjacent[id1] = append(adjacent[id1], &adjacency)
+								adjacent[id1] = append(adjacent[id1], adjacency)
 								if _, ok := adjacent[id2]; !ok {
-									adjacent[id1] = make(AdjacencyList, 0, len(tiles)-1)
+									adjacent[id2] = make(AdjacencyList, 0, len(tiles)-1)
 								}
-								adjacent[id2] = append(adjacent[id2], &adjacency)
+								adjacent[id2] = append(adjacent[id2], adjacency)
 							} /* else if gVerbose {
 								e1, e2 := TileEdge{id1, d1, f1}, TileEdge{id2, d2, f2}
 								fmt.Printf("%v not adjacent to %v\n", e1, e2)
@@ -256,6 +256,33 @@ func Reconstitute(tiles map[int]*Tile) (order []int, err error) {
 				}
 			}
 		}
+	}
+
+	return adjacent
+}
+
+func Corners(tiles map[int]*Tile) (corners [4]int, err error) {
+	// There should be only four tiles with exactly two adjacent tiles.
+	// XXX Currently we count each adjacency twice, so look for four adjacents.
+	adjacencies := Adjacencies(tiles)
+
+	cornerNum := 0
+	for id, adjacency := range adjacencies {
+		if 2 == len(adjacency)/2 /* XXX fix div 2 */ {
+			if gVerbose {
+				fmt.Printf("%d has 2 adjacencies: %v\n", id, adjacency)
+			}
+			if cornerNum == 4 {
+				err = errors.New("too many corners!")
+				break
+			}
+			corners[cornerNum] = id
+			cornerNum++
+		}
+	}
+
+	if cornerNum != 4 {
+		err = errors.New(fmt.Sprintf("not enough corners (%d)!", cornerNum))
 	}
 
 	return
@@ -289,29 +316,36 @@ func Main(input_path string, verbose bool, args []string) error {
 		break
 	}
 
-	grid, err := Reconstitute(tiles)
+	/*
+		grid, err := Reconstitute(tiles)
+		if err != nil {
+			return err
+		}
+
+		if len(grid) != nrows*ncols {
+			return errors.New("result is incomplete")
+		}
+
+		// Print the reconstruction.
+		for row := 0; row != nrows; row++ {
+			for col := 0; col != ncols; col++ {
+				if col != 0 {
+					fmt.Printf("    ")
+				}
+				fmt.Printf("%4d", grid[row*ncols+col])
+			}
+			fmt.Printf("\n")
+		}
+		corners := [...]int{grid[0], grid[ncols-1], grid[(nrows-1)*ncols],
+			grid[nrows*ncols-1]}
+	*/
+
+	corners, err := Corners(tiles)
 	if err != nil {
 		return err
 	}
 
-	if len(grid) != nrows*ncols {
-		return errors.New("result is incomplete")
-	}
-
-	// Print the reconstruction.
-	for row := 0; row != nrows; row++ {
-		for col := 0; col != ncols; col++ {
-			if col != 0 {
-				fmt.Printf("    ")
-			}
-			fmt.Printf("%4d", grid[row*ncols+col])
-		}
-		fmt.Printf("\n")
-	}
-
 	// Print the product of the corner IDs.
-	corners := [...]int{grid[0], grid[ncols-1], grid[(nrows-1)*ncols],
-		grid[nrows*ncols-1]}
 	result := 1
 	for index, value := range corners {
 		if index != 0 {
