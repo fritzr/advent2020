@@ -65,8 +65,13 @@ type Tile struct {
 	//   left := edge[LEFT][UNFLIPPED]
 	//   upFlipped := edge[UP][FLIPPED]
 	//
-	id   int
-	edge edgeHashList
+	id    int
+	edges edgeHashList
+}
+
+type ReverseViewer interface {
+	ReverseRowView(row int) mat.Vector
+	ReverseColView(row int) mat.Vector
 }
 
 type reverseVector struct {
@@ -77,16 +82,20 @@ func (r *reverseVector) AtVec(index int) float64 {
 	return r.Vector.AtVec(r.Len() - index - 1)
 }
 
-func (t *Tile) ReverseRowView(row int) mat.Vector {
+type denseReverseViewable struct {
+	*mat.Dense
+}
+
+func (t *denseReverseViewable) ReverseRowView(row int) mat.Vector {
 	return &reverseVector{t.RowView(row)}
 }
 
-func (t *Tile) ReverseColView(row int) mat.Vector {
+func (t *denseReverseViewable) ReverseColView(row int) mat.Vector {
 	return &reverseVector{t.ColView(row)}
 }
 
 func NewTile(id int, nrows int, ncols int, data []float64) *Tile {
-	t := Tile{mat.NewDense(nrows, ncols, data), id, edgeHashList{}}
+	// First extract hashes of the borders.
 	// The matrix is oriented with directional edges as follows:
 	//
 	//        0  ...  NC-1
@@ -97,18 +106,23 @@ func NewTile(id int, nrows int, ncols int, data []float64) *Tile {
 	//
 	// Compute the hashes of each edge now.
 	// An arrangement of tile T1 is adjacent to an arrangement of another tile T2
-	// when T1.edge[d1][f1] = T2.edge[d2][f2] for some e1,e2,f1,f2.
+	// when T1.edges[d1][f1] = T2.edges[d2][f2] for some e1,e2,f1,f2.
 	// By pre-computing all edge hashes we can query this quickly (assuming our
 	// hashes have no collisions for the input).
-	t.edge[UP][UNFLIPPED] = floatHash(t.RowView(0))
-	t.edge[UP][FLIPPED] = floatHash(t.ReverseRowView(0))
-	t.edge[DOWN][UNFLIPPED] = floatHash(t.RowView(nrows - 1))
-	t.edge[DOWN][FLIPPED] = floatHash(t.ReverseRowView(nrows - 1))
-	t.edge[LEFT][UNFLIPPED] = floatHash(t.ColView(0))
-	t.edge[LEFT][FLIPPED] = floatHash(t.ReverseColView(0))
-	t.edge[RIGHT][UNFLIPPED] = floatHash(t.ColView(ncols - 1))
-	t.edge[RIGHT][FLIPPED] = floatHash(t.ReverseColView(ncols - 1))
-	return &t
+	full := denseReverseViewable{mat.NewDense(nrows, ncols, data)}
+	edges := edgeHashList{}
+	edges[UP][UNFLIPPED] = floatHash(full.RowView(0))
+	edges[UP][FLIPPED] = floatHash(full.ReverseRowView(0))
+	edges[DOWN][UNFLIPPED] = floatHash(full.RowView(nrows - 1))
+	edges[DOWN][FLIPPED] = floatHash(full.ReverseRowView(nrows - 1))
+	edges[LEFT][UNFLIPPED] = floatHash(full.ColView(0))
+	edges[LEFT][FLIPPED] = floatHash(full.ReverseColView(0))
+	edges[RIGHT][UNFLIPPED] = floatHash(full.ColView(ncols - 1))
+	edges[RIGHT][FLIPPED] = floatHash(full.ReverseColView(ncols - 1))
+
+	// Only store the core data -- omit the borders, as the hashes are all that
+	// is necessary (assuming no hash collisions).
+	return &Tile{full.Slice(1, nrows-1, 1, ncols-1).(*mat.Dense), id, edges}
 }
 
 func BytesToFloat(data []byte) []float64 {
@@ -159,7 +173,7 @@ func (e TileEdge) String() string {
 }
 
 func IsAdjacent(t1 *Tile, e1 *TileEdge, t2 *Tile, e2 *TileEdge) bool {
-	return t1.edge[e1.direction][e1.flipped] == t2.edge[e2.direction][e2.flipped]
+	return t1.edges[e1.direction][e1.flipped] == t2.edges[e2.direction][e2.flipped]
 }
 
 type Adjacency = [2]TileEdge
@@ -226,13 +240,13 @@ func Adjacencies(tiles map[int]*Tile) AdjacencyMap {
 	// Naively compute every possible adjacency.
 	for index1, id1 := range ids {
 		t1 := tiles[id1]
-		for d1 := 0; d1 < len(t1.edge); d1++ {
-			for f1 := 0; f1 < len(t1.edge[d1]); f1++ {
+		for d1 := 0; d1 < len(t1.edges); d1++ {
+			for f1 := 0; f1 < len(t1.edges[d1]); f1++ {
 				for index2 := index1 + 1; index2 < len(ids); index2++ {
 					id2 := ids[index2]
 					t2 := tiles[id2]
-					for d2 := 0; d2 < len(t2.edge); d2++ {
-						for f2 := 0; f2 < len(t2.edge[d2]); f2++ {
+					for d2 := 0; d2 < len(t2.edges); d2++ {
+						for f2 := 0; f2 < len(t2.edges[d2]); f2++ {
 							e1, e2 := TileEdge{id1, d1, f1}, TileEdge{id2, d2, f2}
 							if IsAdjacent(t1, &e1, t2, &e2) {
 								adjacency := Adjacency{e1, e2}
