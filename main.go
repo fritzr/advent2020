@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -31,95 +32,84 @@ import (
 
 type AdventMain func(path string, verbose bool, args []string) error
 
-func main() {
-	args := os.Args[1:]
+var puzzles = [...]AdventMain{
+	p01.Main,
+	p02.Main,
+	p03.Main,
+	p04.Main,
+	p05.Main,
+	p06.Main,
+	p07.Main,
+	p08.Main,
+	p09.Main,
+	p10.Main,
+	p11.Main,
+	p12.Main,
+	p13.Main,
+	p14.Main,
+	p15.Main,
+	p16.Main,
+	p17.Main,
+	p18.Main,
+	p19.Main,
+	p20.Main,
+}
 
-	if len(args) > 0 && (args[0] == "-h" || args[0] == "--help") {
-		fmt.Printf("usage: go run %s [day [-v] [-i path] [args...]]\n",
-			path.Base(os.Args[0]))
-		fmt.Println("")
-		fmt.Println(
-			"Run the puzzle the given day's puzzle. Additional puzzle-specific arguments")
-		fmt.Println(
-			"may be accepted for some puzzles. Add -h or --help after the day to find out.")
-		fmt.Println(
-			"All puzzles accept '-v' to run verbose and '-i PATH' to override the input.")
-		os.Exit(1)
-	}
+var verbose bool
+var input string
+
+const (
+	verboseUsage = "enable debug messages"
+	inputUsage   = "puzzle input path"
+)
+
+func init() {
+	flag.BoolVar(&verbose, "verbose", false, verboseUsage)
+	flag.BoolVar(&verbose, "v", false, verboseUsage)
+	flag.StringVar(&input, "input", "", inputUsage)
+	flag.StringVar(&input, "i", "", inputUsage)
+}
+
+func Usage() {
+	fmt.Fprintf(flag.CommandLine.Output(),
+		`usage: %s [OPTIONS...] [--] [[day] [ARGS...]]
+
+Run the given day's puzzle (defaults to the latest implemented puzzle).
+Additional puzzle-specific arguments may be accepted for some puzzles.
+Add -h or --help after the day to find out.
+All puzzles accept '-v' to run verbose and '-i PATH' to override the input.
+
+OPTIONS are:
+`, path.Base(os.Args[0]))
+	flag.PrintDefaults()
+}
+
+func main() {
+	flag.Usage = Usage
+	flag.Parse()
 
 	// day
-	day := 1
-	var puzzle AdventMain = p01.Main
+	day := len(puzzles)
+	puzzle := puzzles[len(puzzles)-1]
+	args := flag.Args()
 	var err error
-	if len(args) > 0 {
-		day, err = strconv.Atoi(args[0])
+	if flag.NArg() > 0 {
+		day, err = strconv.Atoi(flag.Arg(0))
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		switch day {
-		default:
-			log.Fatal(fmt.Printf("unimplemented day '%d'\n", day))
-		case 1:
-			puzzle = p01.Main
-		case 2:
-			puzzle = p02.Main
-		case 3:
-			puzzle = p03.Main
-		case 4:
-			puzzle = p04.Main
-		case 5:
-			puzzle = p05.Main
-		case 6:
-			puzzle = p06.Main
-		case 7:
-			puzzle = p07.Main
-		case 8:
-			puzzle = p08.Main
-		case 9:
-			puzzle = p09.Main
-		case 10:
-			puzzle = p10.Main
-		case 11:
-			puzzle = p11.Main
-		case 12:
-			puzzle = p12.Main
-		case 13:
-			puzzle = p13.Main
-		case 14:
-			puzzle = p14.Main
-		case 15:
-			puzzle = p15.Main
-		case 16:
-			puzzle = p16.Main
-		case 17:
-			puzzle = p17.Main
-		case 18:
-			puzzle = p18.Main
-		case 19:
-			puzzle = p19.Main
-		case 20:
-			puzzle = p20.Main
+		if day <= len(puzzles) {
+			puzzle = puzzles[day-1]
+		} else {
+			log.Fatal(fmt.Sprintf("unimplemented day '%d'\n", day))
 		}
-
-		args = args[1:]
-	}
-
-	// -v
-	verbose := false
-	if len(args) > 0 && (args[0] == "-v" || args[0] == "--verbose") {
-		verbose = true
 		args = args[1:]
 	}
 
 	// input override (-i path)
-	input := path.Join(".", fmt.Sprintf("p%02d", day), "input")
-	if len(args) > 0 && (args[0] == "-i" || args[0] == "--input") {
-		if len(args) < 2 {
-			log.Fatal("missing argument to -i")
-		}
-		input = args[1]
-		args = args[2:]
+	if input == "" {
+		input = path.Join(".", fmt.Sprintf("p%02d", day), "input")
 	}
 
 	// Run the selected puzzle. Pass additional arguments.
