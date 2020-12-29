@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"time"
 	// "github.com/fritzr/advent2020/common"
 	"github.com/fritzr/advent2020/p01"
 	"github.com/fritzr/advent2020/p02"
@@ -57,10 +58,12 @@ var puzzles = [...]AdventMain{
 
 var verbose bool
 var input string
+var clock bool
 
 const (
 	verboseUsage = "enable debug messages"
 	inputUsage   = "puzzle input path"
+	timeUsage    = "output runtimes (ns precision)"
 )
 
 func init() {
@@ -68,6 +71,8 @@ func init() {
 	flag.BoolVar(&verbose, "v", false, verboseUsage)
 	flag.StringVar(&input, "input", "", inputUsage)
 	flag.StringVar(&input, "i", "", inputUsage)
+	flag.BoolVar(&clock, "time", false, timeUsage)
+	flag.BoolVar(&clock, "t", false, timeUsage)
 }
 
 func Usage() {
@@ -113,8 +118,16 @@ func main() {
 	}
 
 	// Run the selected puzzle. Pass additional arguments.
+	var stime time.Time
+	if clock {
+		stime = time.Now()
+	}
 	err = puzzle(input, verbose, args)
 	if err != nil {
 		log.Fatal(err)
+	}
+	if clock {
+		elapsed := time.Since(stime)
+		fmt.Printf("# elapsed time: %v\n", elapsed)
 	}
 }
